@@ -1,0 +1,17 @@
+numpy 
+pandas
+pytorch >=2.1.1
+pytorch-cuda>=11.8
+torchdata==0.7.0
+dgl==2.2.1
+deepspeed
+ogb
+wandb
+dm-tree
+transformers
+torchtext
+wget
+tqdm
+sentence-transformers
+gdown
+scipy
