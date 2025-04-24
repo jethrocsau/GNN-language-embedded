@@ -8,8 +8,8 @@ import os
 from src.models import build_model
 
 # self-made utils
-from utils.load_data import load_dataloader, LinearProbingDataLoader, setup_incontext_dataloader
-from utils.utils import (
+from src.utils.load_data import load_dataloader, LinearProbingDataLoader, setup_incontext_dataloader
+from src.utils.utils import (
     create_optimizer,
     set_random_seed,
     create_scheduler,

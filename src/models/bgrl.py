@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 import copy
 from src.gnn_modules import setup_module
-from utils.augmentation import random_aug,drop_feature
+from src.utils.augmentation import random_aug,drop_feature
 
 class model_bgrl(nn.Module):
 

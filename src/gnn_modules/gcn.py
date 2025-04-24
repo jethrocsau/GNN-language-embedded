@@ -6,7 +6,7 @@ import dgl
 import dgl.function as fn
 from dgl.utils import expand_as_pair
 from src.gnn_modules.module_utils import create_activation,create_norm
-#from fastmoe.fmoe import SSLfmoefy
+from fmoe import SSLfmoefy
 from src.utils.utils import print_rank_0
 
 class GCN(nn.Module):
@@ -113,12 +113,12 @@ class GraphConv(nn.Module):
         else:
             self.register_buffer('res_fc', None)
 
-        # if norm == "batchnorm":
-        #     self.norm = nn.BatchNorm1d(out_dim)
-        # elif norm == "layernorm":
-        #     self.norm = nn.LayerNorm(out_dim)
-        # else:
-        #     self.norm = None
+        if norm == "batchnorm":
+            self.norm = nn.BatchNorm1d(out_dim)
+        elif norm == "layernorm":
+            self.norm = nn.LayerNorm(out_dim)
+        else:
+            self.norm = None
 
         self.norm = norm
         if norm is not None:
@@ -130,9 +130,9 @@ class GraphConv(nn.Module):
         #add MOE
         if moe:
             print_rank_0("use moe bulid GCN")
-            if self.fc != None :
+            #if self.fc != None :
                 #self.fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.fc.in_features, hidden_hidden_size=self.fc.in_features*hhsize_time ,d_outsize=self.fc.out_features, top_k=top_k, use_linear=moe_use_linear)
-            if hasattr(self, 'res_fc') and isinstance(self.res_fc, nn.Linear) :
+            #if hasattr(self, 'res_fc') and isinstance(self.res_fc, nn.Linear) :
                 #self.res_fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.res_fc.in_features, hidden_hidden_size=self.res_fc.in_features*hhsize_time ,d_outsize=self.res_fc.out_features, top_k=top_k, use_linear=moe_use_linear)
 
 

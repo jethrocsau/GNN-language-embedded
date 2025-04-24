@@ -4,17 +4,17 @@ import torch
 import torch.multiprocessing
 from torch.utils.data import DataLoader
 import dgl.dataloading
-from utils.augmentation import mask_edge, drop_feature
-from datasets import load_large_dataset
-from utils.utils import show_occupied_memory
+from src.utils.augmentation import mask_edge, drop_feature
+from src.datasets import load_large_dataset
+from src.utils.utils import show_occupied_memory
 import random
 import time
 #import dgl
 
-def load_dataloader(load_type, dataset_name, args, pretrain_seed=None ): 
+def load_dataloader(load_type, dataset_name, args, pretrain_seed=None ):
     if load_type== "eval":
         feats, graph, labels, split_idx, ego_graph_nodes = load_large_dataset(dataset_name, args.data_dir,
-                                                                            args.ego_graph_file_path,  args.no_scale, args.multi_scale, feat_type=args.feat_type, drop_model=args.drop_model)  
+                                                                            args.ego_graph_file_path,  args.no_scale, args.multi_scale, feat_type=args.feat_type, drop_model=args.drop_model)
         print("loading data with LC sampler for evaluating")
         batch_size = args.batch_size_f
         shuffle = False
@@ -25,9 +25,9 @@ def load_dataloader(load_type, dataset_name, args, pretrain_seed=None ):
             feats=feats,
             batch_size=batch_size,
             shuffle=shuffle,
-            drop_last=False, 
+            drop_last=False,
             persistent_workers=True,
-            num_workers=args.prob_num_workers 
+            num_workers=args.prob_num_workers
         )
         num_train, num_val, num_test = [split_idx[k].shape[0] for k in ["train", "valid", "test"]]
         train_g_idx = np.arange(0, num_train)
@@ -35,7 +35,7 @@ def load_dataloader(load_type, dataset_name, args, pretrain_seed=None ):
         test_g_idx = np.arange(num_train + num_val, num_train + num_val + num_test)
         train_lbls, val_lbls, test_lbls = labels[train_g_idx], labels[val_g_idx], labels[test_g_idx]
         return (num_train, num_val, num_test), (train_lbls, val_lbls, test_lbls), dataloader
-    
+
     else:
         if args.pretrain_dataset == None:
             pretrain_dataset = ["ogbn-arxiv","ogbn-products","ogbn-papers100M"]
@@ -45,17 +45,17 @@ def load_dataloader(load_type, dataset_name, args, pretrain_seed=None ):
         for pd in pretrain_dataset:
             feats, graph, _ , _, ego_graph_nodes = load_large_dataset(pd, args.data_dir, None,  args.no_scale, args.multi_scale, feat_type=args.feat_type, drop_model=args.drop_model)
             if pd in ["Wiki","ConceptNet","FB15K237"]:
-                ego_graph_nodes = ego_graph_nodes[0] 
+                ego_graph_nodes = ego_graph_nodes[0]
             else:
                 ego_graph_nodes = ego_graph_nodes[0] + ego_graph_nodes[1] + ego_graph_nodes[2]
             datasets.append(BaseDataset(feats, graph, ego_graph_nodes))
 
         if args.deepspeed:
             provider_rank = torch.distributed.get_rank()
-            world_size = torch.cuda.device_count() 
+            world_size = torch.cuda.device_count()
         else:
             provider_rank = None
-            world_size = None 
+            world_size = None
 
         data_provider = DataProvider(datasets, weights=args.weight, default_dataset=args.default_dataset, deepspeed=args.deepspeed, provider_rank=provider_rank, world_size=world_size, batch_size=args.batch_size)
 
@@ -67,22 +67,22 @@ def load_dataloader(load_type, dataset_name, args, pretrain_seed=None ):
             )
             print(f"rank: {rank}, world_size: {world_size}")
 
-            def worker_init_fn(worker_id): 
+            def worker_init_fn(worker_id):
                 assert pretrain_seed != None
                 np.random.seed(pretrain_seed)
 
             dataloader = DataLoader(
-                data_provider, 
+                data_provider,
                 collate_fn=Collator(args.drop_edge_rate, dataset_drop_edge = [ pretrain_dataset.index(data_name) for data_name in  args.dataset_drop_edge] if args.drop_edge_rate>0 else None  , SSL_model=args.model, drop_model=args.drop_model,  dataset_drop_feat=[ pretrain_dataset.index(data_name) for data_name in  args.dataset_drop_feat] if args.dataset_drop_feat!=None else list(range(len(pretrain_dataset))), drop_feature_rate_1=args.drop_feature_rate_1, drop_feature_rate_2=args.drop_feature_rate_2),
                 batch_size=args.batch_size,
                 num_workers=args.pretrain_num_workers,
-                worker_init_fn = worker_init_fn, 
+                worker_init_fn = worker_init_fn,
                 persistent_workers=True,
                 sampler=sampler,
             )
         else:
             dataloader = DataLoader(
-                data_provider, 
+                data_provider,
                 collate_fn=Collator(args.drop_edge_rate, dataset_drop_edge = [ pretrain_dataset.index(data_name) for data_name in  args.dataset_drop_edge] if args.drop_edge_rate>0 else None , SSL_model=args.model, drop_model=args.drop_model,   dataset_drop_feat=[ pretrain_dataset.index(data_name) for data_name in  args.dataset_drop_feat] if args.dataset_drop_feat!=None else list(range(len(pretrain_dataset))), drop_feature_rate_1=args.drop_feature_rate_1, drop_feature_rate_2=args.drop_feature_rate_2),
                 batch_size=args.batch_size,
                 num_workers=args.pretrain_num_workers,
@@ -112,8 +112,8 @@ class LocalClusteringLoader(DataLoader):
         if torch.is_tensor(self.feats):
             sg.ndata["feat"] = self.feats[nodes].to(torch.float32)
         else:
-            sg.ndata["feat"] = self.feats(nodes.numpy()) 
-        targets = torch.from_numpy(cum_num_nodes)      
+            sg.ndata["feat"] = self.feats(nodes.numpy())
+        targets = torch.from_numpy(cum_num_nodes)
         return sg, targets, None, nodes
 
 class LinearProbingDataLoader(DataLoader):
@@ -132,8 +132,8 @@ class LinearProbingDataLoader(DataLoader):
 class BaseDataset(object):
     dataset_name: str = "basic_dataset"
     def __init__(
-            self,  
-            feat, 
+            self,
+            feat,
             graph,
             ego_graph,
         ):
@@ -148,17 +148,17 @@ class BaseDataset(object):
         if torch.is_tensor(self.feats):
             feats = self.feats[context_nodes].to(torch.float32)
         else:
-            feats = self.feats(context_nodes)   
+            feats = self.feats(context_nodes)
         return subg, feats
-        
+
     def __len__(self):
         return len(self.ego_graphs)
-    
+
     def get_subgraph(self, idx):
         context = self.ego_graphs[idx]
         subg = self.graph.subgraph(context, store_ids=False)
         return context, subg
-       
+
 class DataProvider(object):
     def __init__(self, datasets, weights=None, default_dataset=None, deepspeed=False, provider_rank=None, world_size=None,batch_size=None): #weight:list
         self.deepspeed = deepspeed
@@ -194,41 +194,41 @@ class DataProvider(object):
             i: self.length_dataset[i] for i in range(len(self.length_dataset))
         }
         self.random_mapping = self.bulid_each_dataset_random_map()
-        
+
         total_num_for_train = sum(self.augement_len)
         self.tot_shuffle_map = np.arange(total_num_for_train)
         np.random.shuffle(self.tot_shuffle_map)
-    
+
     def bulid_each_dataset_random_map(self):
-        random_mapping = [] 
+        random_mapping = []
         for l in self.len_dataset:
             mapping = np.arange(l)
             np.random.shuffle(mapping)
             random_mapping.append(mapping)
         return random_mapping
-        
+
     def __len__(self):
-        lens = self.augement_len 
+        lens = self.augement_len
         return sum(lens)
 
     def __getitem__(self, index):
         dataset_idx, idx = self.get_dataset_idx(index)
         dataset = self.datasets[dataset_idx]
-        # remapping makes index random 
+        # remapping makes index random
         idx = self.random_mapping[dataset_idx][idx]
         return dataset[idx] , dataset_idx
 
     def get_dataset_idx(self, index):
         if self.deepspeed:
-            worker_start_id = self.provider_rank + self.world_size* torch.utils.data.get_worker_info().id * self.batch_size 
-            if index == worker_start_id :  
-                #print(f"rank {self.provider_rank} worker id {torch.utils.data.get_worker_info().id} shuffle data provider. start_id {worker_start_id}") 
+            worker_start_id = self.provider_rank + self.world_size* torch.utils.data.get_worker_info().id * self.batch_size
+            if index == worker_start_id :
+                #print(f"rank {self.provider_rank} worker id {torch.utils.data.get_worker_info().id} shuffle data provider. start_id {worker_start_id}")
                 np.random.shuffle(self.tot_shuffle_map) #shuffle total map
                 self.random_mapping = self.bulid_each_dataset_random_map()  #shuffle seqerate map
-                #print("rank",self.provider_rank,"workerid",torch.utils.data.get_worker_info(),self.tot_shuffle_map,self.random_mapping)  
+                #print("rank",self.provider_rank,"workerid",torch.utils.data.get_worker_info(),self.tot_shuffle_map,self.random_mapping)
             index = self.tot_shuffle_map[index]
-        #print("rank",self.provider_rank,"workerid",torch.utils.data.get_worker_info(),self.tot_shuffle_map,self.random_mapping) 
-        
+        #print("rank",self.provider_rank,"workerid",torch.utils.data.get_worker_info(),self.tot_shuffle_map,self.random_mapping)
+
         for i, x in self.length_dataset.items():
             if index < x:
                 dataset_idx = i
@@ -238,13 +238,13 @@ class DataProvider(object):
                     idx = (index - self.length_dataset[dataset_idx - 1])% self.len_dataset[i]
                 return dataset_idx, idx
         raise ValueError
-    
+
 class Collator(object):
     def __init__(self, drop_edge_rate=0, dataset_drop_edge = [0,1,2], SSL_model="graphmae", drop_model="random", dataset_drop_feat=[0,1,2], drop_feature_rate_1=0, drop_feature_rate_2=0):
         self._drop_edge_rate = drop_edge_rate
         self.dataset_drop_edge = dataset_drop_edge
         self.SSL_model = SSL_model
-        self.drop_model = drop_model  # "directed_to_undirected"  
+        self.drop_model = drop_model  # "directed_to_undirected"
         self.dataset_drop_feat = dataset_drop_feat
         self.drop_feature_rate_1 = drop_feature_rate_1
         self.drop_feature_rate_2 = drop_feature_rate_2
@@ -261,14 +261,14 @@ class Collator(object):
         elif self.drop_model == "directed_to_undirected":
             random_number = random.random()
             if random_number <self._drop_edge_rate:
-                g = dgl.to_bidirected(g) 
+                g = dgl.to_bidirected(g)
                 g = g.remove_self_loop().add_self_loop()
             return g
         else:
             raise ValueError
 
     def __call__(self, batch):
-        #[0][0]subg, [0][1]context_id，[1] dataset_id 
+        #[0][0]subg, [0][1]context_id，[1] dataset_id
         subgraphs = [x[0][0] for x in batch]
         targets = np.cumsum([0] + [x.num_nodes() for x in subgraphs])[:-1]
         targets = torch.from_numpy(targets)
@@ -291,7 +291,7 @@ class Collator(object):
                 return subg,  targets, feats , context_nodes_dataset_id, drop_subg
             else:
                 return subg,  targets, feats , context_nodes_dataset_id
-        
+
         elif self.SSL_model == "graphmae2":
             if self._drop_edge_rate > 0:
                 drop_subgraphs1 = []
@@ -308,20 +308,20 @@ class Collator(object):
 
                 drop_subg1 = dgl.batch(drop_subgraphs1)
                 drop_subg2 = dgl.batch(drop_subgraphs2)
-                return subg,  targets, feats , context_nodes_dataset_id, drop_subg1, drop_subg2    
+                return subg,  targets, feats , context_nodes_dataset_id, drop_subg1, drop_subg2
             else:
                 return subg,  targets, feats , context_nodes_dataset_id
-        
+
         elif self.SSL_model == "grace" or self.SSL_model == "bgrl":
             if self.drop_feature_rate_1 >0 or self.drop_feature_rate_2 >0 :
                 drop_feat1 = []
                 drop_feat2 = []
                 for idx, dataset_id in enumerate(context_nodes_dataset_id):
                     x = batch[idx]
-                    sg_feat = x[0][1] 
+                    sg_feat = x[0][1]
                     if dataset_id in self.dataset_drop_feat:
-                        feat1 = drop_feature(sg_feat, self.drop_feature_rate_1) 
-                        feat2 = drop_feature(sg_feat, self.drop_feature_rate_2)                 
+                        feat1 = drop_feature(sg_feat, self.drop_feature_rate_1)
+                        feat2 = drop_feature(sg_feat, self.drop_feature_rate_2)
                     else:
                         feat1 = sg_feat.clone()
                         feat2 = sg_feat.clone()
@@ -348,7 +348,7 @@ class Collator(object):
 
                 drop_subg1 = dgl.batch(drop_subgraphs1)
                 drop_subg2 = dgl.batch(drop_subgraphs2)
-                return subg,  targets, drop_feat1, drop_feat2 , context_nodes_dataset_id, drop_subg1, drop_subg2    
+                return subg,  targets, drop_feat1, drop_feat2 , context_nodes_dataset_id, drop_subg1, drop_subg2
             else:
                 return subg,  targets, drop_feat1, drop_feat2  , context_nodes_dataset_id
         else:
@@ -372,13 +372,13 @@ class InContextDataset(torch.utils.data.IterableDataset):
                                                                                             args.ego_graph_file_path,  args.no_scale, args.multi_scale, feat_type=args.feat_type, drop_model="random")
 
         self.split_len = {"train": range(self.split_idx["train"].shape[0]),
-                         "valid": range(self.split_idx["train"].shape[0],self.split_idx["train"].shape[0]+self.split_idx["valid"].shape[0]), 
+                         "valid": range(self.split_idx["train"].shape[0],self.split_idx["train"].shape[0]+self.split_idx["valid"].shape[0]),
                          "test": range(self.split_idx["train"].shape[0]+self.split_idx["valid"].shape[0],self.split_idx["train"].shape[0]+self.split_idx["valid"].shape[0]+self.split_idx["test"].shape[0])}
 
         self.split_num_start = {"train": 0,
-                                "valid": self.split_idx["train"].shape[0], 
+                                "valid": self.split_idx["train"].shape[0],
                                 "test":self.split_idx["train"].shape[0]+self.split_idx["valid"].shape[0]}
-       
+
         self.graph.ndata["feat"] = feats
         print(f"Finish loading the graph")
         self.label_dict = dict()
@@ -400,11 +400,11 @@ class InContextDataset(torch.utils.data.IterableDataset):
             self.total_steps = args.total_steps
         else:
             self.total_steps = eval_tasks
-        
+
     def get_khop_graph(self, nid, khop=2, drop_node=False):
         graph, _ = dgl.khop_out_subgraph(self.graph, nid.to(torch.int32), khop)
         return graph
-    
+
     def generate_batch(self, batch_type="mt"):
         def sample(sample_list, size):
             if len(sample_list) >= size:
@@ -416,7 +416,7 @@ class InContextDataset(torch.utils.data.IterableDataset):
         m = self.num_label
         if batch_type == "mt":
             if self.fs_label == "total":
-                current_labels = np.random.choice(range(self.total_labels), m, replace=False) 
+                current_labels = np.random.choice(range(self.total_labels), m, replace=False)
             elif self.fs_label == "ofa":
                 if self.dataset_name == "ogbn-arxiv":
                     current_labels = np.random.choice( [17,39,10,5,16,15,18,37,30,33] , m, replace=False)
@@ -450,7 +450,7 @@ class InContextDataset(torch.utils.data.IterableDataset):
                 if self.sample_position == "train_test" :
                     examples = sample(self.label_dict[label]["train"], k) + sample(self.label_dict[label]["test"], n)
                 elif self.sample_position == "total" :
-                    examples = sample(self.label_dict[label]["total"], k+n) 
+                    examples = sample(self.label_dict[label]["total"], k+n)
 
             for i in range(k):
                 if self.dataset_name in self.node_classify_task: #example: [nodeid,]
@@ -459,14 +459,14 @@ class InContextDataset(torch.utils.data.IterableDataset):
                     support_examples.append(self.get_khop_graph(examples[i][0], self.args.khop, drop_node=True))
                     support_examples.append(self.get_khop_graph(examples[i][1], self.args.khop, drop_node=True))
                 support_labels.append(idx)
-                
+
             for i in range(n):
                 if self.dataset_name in self.node_classify_task: #example: [nodeid,]
                     query_examples.append(self.get_khop_graph(examples[k + i], self.args.khop, drop_node=True))
                 elif  self.dataset_name in self.link_predict_task: #example: [tensor(nodeid1,nodeid2),]
                     query_examples.append(self.get_khop_graph(examples[k + i][0], self.args.khop, drop_node=True))
                     query_examples.append(self.get_khop_graph(examples[k + i][1], self.args.khop, drop_node=True))
-                query_labels.append(idx)    
+                query_labels.append(idx)
         all_examples = support_examples + query_examples
         data_graph = dgl.batch(all_examples)
         labels = torch.LongTensor(query_labels)

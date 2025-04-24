@@ -1,5 +1,5 @@
 import trainer_large
-from utils.utils import build_args, process_args,Logger
+from src.utils.utils import build_args, process_args,Logger
 import sys
 import json
 import wandb
@@ -29,10 +29,9 @@ def main():
     train_eval(args)
     wandb.finish()
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     main()
 
-    
 
 
-    
+

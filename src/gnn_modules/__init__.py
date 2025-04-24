@@ -7,7 +7,7 @@ from src.gnn_modules.gcn import GCN
 from src.gnn_modules.dot_gat import DotGAT
 #from src.gnn_modules.LightGCN import LightGCN
 from src.gnn_modules.module_utils import create_activation, create_norm
-from transformers import RobertaTokenizer, RobertaConfig, RobertaModel
+#from transformers import RobertaTokenizer, RobertaConfig, RobertaModel
 
 debug = True
 
@@ -104,7 +104,7 @@ def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropo
 
     return mod
 
-
+'''
 class Supervised_gnn_classification(nn.Module):
     def __init__(self, m_type, in_dim, num_hidden, out_dim, num_layers, dropout=0.2, activation='relu', residual=False,
                  norm=None, nhead=4, attn_drop=0.1, negative_slope=0.2, use_roberta=False):
@@ -233,3 +233,4 @@ class Supervised_gnn_link_prediction(nn.Module):
         elif self.m_type == "mlp":
             out = self.classifier(x)
         return out
+'''

@@ -100,7 +100,7 @@ def get_current_lr(optimizer):
     return optimizer.state_dict()["param_groups"][0]["lr"]
 
 
-def process_args(args):    
+def process_args(args):
     if args.use_cfg:
         path = args.use_cfg_path
         if path == "":
@@ -125,11 +125,11 @@ def process_args(args):
             if "lr" in k or "weight_decay" in k or "tau" in k or "lambd" in k:
                 v = float(v)
             setattr(args, k, v)
-    
+
     if not args.logging_path.endswith('.log'):
         os.makedirs(args.logging_path, exist_ok=True)
         args.logging_path = os.path.join(args.logging_path,
-                                         f"{args.model}_{args.dataset}_lc.log")   
+                                         f"{args.model}_{args.dataset}_lc.log")
     return args
 
 
@@ -174,7 +174,7 @@ class LogisticRegression(nn.Module):
     def forward(self, x):
         logits = self.linear(x)
         return logits
- 
+
 def accuracy(y_pred, y_true):
     y_true = y_true.squeeze().long()
     preds = y_pred.max(1)[1].type_as(y_true)
@@ -187,7 +187,7 @@ def F1_score(y_pred, y_true):
     y_pred = y_pred.max(1)[1].type_as(y_true)
     y_pred = y_pred.cpu().numpy().astype('int32')
     y_true = y_true.cpu().numpy().astype('int32')
-    
+
     f1 = f1_score(y_true, y_pred)
     recall = recall_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred)
@@ -263,7 +263,7 @@ def build_args():
     parser.add_argument('--pred_hid', type=int, default=256)
     parser.add_argument("--moving_average_decay", type=float, default=0.99)
     parser.add_argument('--ema_total_steps', type=int, default=1000)
-    
+
     # parameters of ggd
     parser.add_argument('--drop_feat', type=float, default=0.1)
     parser.add_argument("--num_proj_layers", type=int, default=1, help="number of project linear layers")
@@ -302,7 +302,7 @@ def build_args():
     parser.add_argument("--multi_scale", action="store_true")
     parser.add_argument("--feat_type", type=str, default="e5_float16") #linkpredict
     parser.add_argument("--weight", type=int, nargs="+", default=None)
-    parser.add_argument("--default_dataset", type=str, default=None) 
+    parser.add_argument("--default_dataset", type=str, default=None)
     parser.add_argument("--top_k", type=int, default=1)
     parser.add_argument("--num_expert", type=int, default=4)
     parser.add_argument("--hiddenhidden_size_times", type=int, default=1)
@@ -324,7 +324,7 @@ def build_args():
     parser.add_argument("--graphmae2_ema_graph_nodrop", action="store_true")
     #for grace and bgrl
     parser.add_argument("--dataset_drop_feat", type=str, nargs="+", default=None)
-    #few shot 
+    #few shot
     parser.add_argument("--few_shot", action="store_true")
     parser.add_argument("--eval_num_label", type=int, default=5)
     parser.add_argument("--eval_num_support", type=int, default=5)
@@ -332,7 +332,7 @@ def build_args():
     parser.add_argument("--khop", type=int, default=1)
     parser.add_argument("--total_steps", type=int, default=500)
     parser.add_argument("--sample_position", type=str, default="total") #train_test
-    parser.add_argument("--fs_label", type=str, default="total") #ofa    
+    parser.add_argument("--fs_label", type=str, default="total") #ofa
     args = parser.parse_args()
     return args
 

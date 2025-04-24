@@ -4,7 +4,7 @@ from src.models.grace import model_grace
 from src.models.cca_ssg import model_cca_ssg
 from src.models.bgrl import model_bgrl
 from src.models.ggd import model_ggd
-from src.gnn_modules import Supervised_gnn_classification #,LightGCN
+#from src.gnn_modules import Supervised_gnn_classification #,LightGCN
 import torch
 
 

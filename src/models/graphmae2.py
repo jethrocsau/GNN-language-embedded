@@ -9,7 +9,7 @@ import dgl
 import numpy as np
 import wandb
 
-from gnn_modules import setup_module
+from src.gnn_modules import setup_module
 import torch.distributed as dist
 
 
@@ -44,14 +44,14 @@ class model_graphmae2(nn.Module):
             replace_rate: float = 0.0,
             zero_init: bool = False,
             top_k=1,
-            hhsize_time=1, 
+            hhsize_time=1,
             num_expert=4,
             moe=True,
             moe_use_linear=False,
-            decoder_no_moe=False, 
+            decoder_no_moe=False,
             moe_layer=None,
             deepspeed=False,
-            graphmae2_ema_graph_nodrop=False, 
+            graphmae2_ema_graph_nodrop=False,
     ):
         super(model_graphmae2, self).__init__()
         self._mask_rate = mask_rate
@@ -106,7 +106,7 @@ class model_graphmae2(nn.Module):
             residual=residual,
             norm=norm,
             top_k=top_k,
-            hhsize_time=hhsize_time, 
+            hhsize_time=hhsize_time,
             num_expert=num_expert,
             moe=moe,
             moe_use_linear=moe_use_linear,
@@ -130,7 +130,7 @@ class model_graphmae2(nn.Module):
             norm=norm,
             concat_out=True,
             top_k=top_k,
-            hhsize_time=hhsize_time, 
+            hhsize_time=hhsize_time,
             num_expert=num_expert,
             moe=moe if decoder_no_moe==False else False,
             moe_use_linear=moe_use_linear,
@@ -180,7 +180,7 @@ class model_graphmae2(nn.Module):
             residual=residual,
             norm=norm,
             top_k=top_k,
-            hhsize_time=hhsize_time, 
+            hhsize_time=hhsize_time,
             num_expert=num_expert,
             moe=moe,
             moe_use_linear=moe_use_linear,
@@ -241,7 +241,7 @@ class model_graphmae2(nn.Module):
             #drop_g2 = drop_g2 if drop_g2 is not None else g
             if drop_g2 is None or self.graphmae2_ema_graph_nodrop:
                 drop_g2 = g
-         
+
             latent_target = self.encoder_ema(drop_g2, x, )
             if targets is not None:
                 latent_target = self.projector_ema(latent_target[targets])
@@ -286,7 +286,7 @@ class model_graphmae2(nn.Module):
             if dist.get_rank() == 0:
                 wandb.log({"pretrain/mae2 recover loss": loss_rec.item()})
                 wandb.log({f"pretrain/mae2 {self._lam}times latent loss": self._lam * loss_latent.item()})
-        else:                   
+        else:
             wandb.log({"pretrain/mae2 recover loss": loss_rec.item()})
             wandb.log({f"pretrain/mae2 {self._lam}times latent loss": self._lam * loss_latent.item()})
 
