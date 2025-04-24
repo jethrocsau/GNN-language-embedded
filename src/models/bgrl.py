@@ -4,7 +4,7 @@ import torch
 from typing import Optional
 import numpy as np
 import copy
-from gnn_modules import setup_module
+from src.gnn_modules import setup_module
 from utils.augmentation import random_aug,drop_feature
 
 class model_bgrl(nn.Module):
@@ -82,13 +82,13 @@ class model_bgrl(nn.Module):
         #graph1, feat1 = random_aug(g.remove_self_loop(), x, self.drop_feature_rate_1, self.drop_edge_rate_1)
         #graph2, feat2 = random_aug(g.remove_self_loop(), x, self.drop_feature_rate_2, self.drop_edge_rate_2)
 
-        #feat1 = drop_feature(x, self.drop_feature_rate_1) 
-        #feat2 = drop_feature(x, self.drop_feature_rate_2) 
+        #feat1 = drop_feature(x, self.drop_feature_rate_1)
+        #feat2 = drop_feature(x, self.drop_feature_rate_2)
         feat1 = drop_feat1
         feat2 = drop_feat2
         graph1 = drop_g1
         graph2 = drop_g2
-              
+
         # encoding
         v1_student = self.student_encoder(graph1, feat1)
         v2_student = self.student_encoder(graph2, feat2)
@@ -127,7 +127,7 @@ class EMA:
         beta = 1 - (1 - self.beta) * (np.cos(np.pi * self.step / self.total_steps) + 1) / 2.0
         #self.step += 1
         return old * beta + (1 - beta) * new
-    
+
     def update_step(self):
         self.step += 1
 

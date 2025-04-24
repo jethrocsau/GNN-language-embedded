@@ -5,9 +5,9 @@ import torch.nn.functional as F
 import dgl
 import dgl.function as fn
 from dgl.utils import expand_as_pair
-from gnn_modules.module_utils import create_activation,create_norm
-from fmoe import SSLfmoefy
-from utils.utils import print_rank_0
+from src.gnn_modules.module_utils import create_activation,create_norm
+#from fastmoe.fmoe import SSLfmoefy
+from src.utils.utils import print_rank_0
 
 class GCN(nn.Module):
     def __init__(self,
@@ -40,7 +40,7 @@ class GCN(nn.Module):
         last_activation = create_activation(activation) if encoding else None
         last_residual = encoding and residual
         last_norm = norm if encoding else None
-        
+
         if num_layers == 1:
             self.gcn_layers.append(GraphConv(
                 in_dim, out_dim, residual=last_residual, norm=last_norm, activation=last_activation,
@@ -119,7 +119,7 @@ class GraphConv(nn.Module):
         #     self.norm = nn.LayerNorm(out_dim)
         # else:
         #     self.norm = None
-        
+
         self.norm = norm
         if norm is not None:
             self.norm = norm(out_dim)
@@ -127,13 +127,13 @@ class GraphConv(nn.Module):
 
         self.reset_parameters()
 
-        #add MOE 
+        #add MOE
         if moe:
             print_rank_0("use moe bulid GCN")
             if self.fc != None :
-                self.fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.fc.in_features, hidden_hidden_size=self.fc.in_features*hhsize_time ,d_outsize=self.fc.out_features, top_k=top_k, use_linear=moe_use_linear)
+                #self.fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.fc.in_features, hidden_hidden_size=self.fc.in_features*hhsize_time ,d_outsize=self.fc.out_features, top_k=top_k, use_linear=moe_use_linear)
             if hasattr(self, 'res_fc') and isinstance(self.res_fc, nn.Linear) :
-                self.res_fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.res_fc.in_features, hidden_hidden_size=self.res_fc.in_features*hhsize_time ,d_outsize=self.res_fc.out_features, top_k=top_k, use_linear=moe_use_linear)
+                #self.res_fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.res_fc.in_features, hidden_hidden_size=self.res_fc.in_features*hhsize_time ,d_outsize=self.res_fc.out_features, top_k=top_k, use_linear=moe_use_linear)
 
 
 
@@ -170,7 +170,7 @@ class GraphConv(nn.Module):
             graph.srcdata['h'] = feat_src
             graph.update_all(aggregate_fn, fn.sum(msg='m', out='h'))
             rst = graph.dstdata['h']
-            
+
             rst = self.fc(rst)
 
             # if self._norm in ['right', 'both']:
@@ -197,21 +197,21 @@ class GraphConv(nn.Module):
             feat_src, feat_dst = expand_as_pair(feat, graph)
 
             feat_src = self.fc(feat_src)
-           
+
             degs = graph.out_degrees().float().clamp(min=1)
             norm = torch.pow(degs, -0.5)
             shp = norm.shape + (1,) * (feat_src.dim() - 1)
             norm = torch.reshape(norm, shp)
             feat_src = feat_src * norm
 
-          
+
             graph.srcdata['h'] = feat_src
             graph.update_all(aggregate_fn, fn.sum(msg='m', out='h'))
             rst = graph.dstdata['h']
-            
+
             # rst = self.fc(rst)
 
-           
+
             degs = graph.in_degrees().float().clamp(min=1)
             norm = torch.pow(degs, -0.5)
             shp = norm.shape + (1,) * (feat_dst.dim() - 1)

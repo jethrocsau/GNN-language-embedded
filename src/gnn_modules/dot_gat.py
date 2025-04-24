@@ -3,7 +3,7 @@ from torch import nn
 import dgl.function as fn
 from dgl.nn.functional import edge_softmax
 from dgl.utils import expand_as_pair
-from gnn_modules.module_utils import create_activation,create_norm
+from src.gnn_modules.module_utils import create_activation,create_norm
 
 
 class DotGAT(nn.Module):
@@ -34,7 +34,7 @@ class DotGAT(nn.Module):
         last_activation = create_activation(activation) if encoding else None
         last_residual = (encoding and residual)
         last_norm = norm if encoding else None
-        
+
         if num_layers == 1:
             self.gat_layers.append(DotGatConv(
                 in_dim, out_dim, nhead_out,
@@ -54,9 +54,9 @@ class DotGAT(nn.Module):
             self.gat_layers.append(DotGatConv(
                 num_hidden * nhead, out_dim, nhead_out,
                 feat_drop, attn_drop, last_residual, activation=last_activation, norm=last_norm, concat_out=concat_out,allow_zero_in_degree=allow_zero_degree))
-    
+
         self.head = nn.Identity()
-    
+
     def forward(self, g, inputs, return_hidden=False):
         h = inputs
         hidden_list = []

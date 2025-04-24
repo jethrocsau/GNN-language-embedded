@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
 from dgl.utils import expand_as_pair
-from gnn_modules.module_utils import create_activation,create_norm
+from src.gnn_modules.module_utils import create_activation,create_norm
 
 
 class GIN(nn.Module):
@@ -30,7 +30,7 @@ class GIN(nn.Module):
         last_activation = create_activation(activation) if encoding else None
         last_residual = encoding and residual
         last_norm = norm if encoding else None
-        
+
         if num_layers == 1:
             apply_func = MLP(2, in_dim, num_hidden, out_dim, activation=activation, norm=norm)
             if last_norm:
@@ -39,9 +39,9 @@ class GIN(nn.Module):
         else:
             # input projection (no residual)
             self.layers.append(GINConv(
-                in_dim, 
-                num_hidden, 
-                ApplyNodeFunc(MLP(2, in_dim, num_hidden, num_hidden, activation=activation, norm=norm), activation=activation, norm=norm), 
+                in_dim,
+                num_hidden,
+                ApplyNodeFunc(MLP(2, in_dim, num_hidden, num_hidden, activation=activation, norm=norm), activation=activation, norm=norm),
                 init_eps=0,
                 learn_eps=learn_eps,
                 residual=residual)
@@ -50,8 +50,8 @@ class GIN(nn.Module):
             for l in range(1, num_layers - 1):
                 # due to multi-head, the in_dim = num_hidden * num_heads
                 self.layers.append(GINConv(
-                    num_hidden, num_hidden, 
-                    ApplyNodeFunc(MLP(2, num_hidden, num_hidden, num_hidden, activation=activation, norm=norm), activation=activation, norm=norm), 
+                    num_hidden, num_hidden,
+                    ApplyNodeFunc(MLP(2, num_hidden, num_hidden, num_hidden, activation=activation, norm=norm), activation=activation, norm=norm),
                     init_eps=0,
                     learn_eps=learn_eps,
                     residual=residual)
@@ -106,7 +106,7 @@ class GINConv(nn.Module):
             self._reducer = fn.mean
         else:
             raise KeyError('Aggregator type {} not recognized.'.format(aggregator_type))
-            
+
         if learn_eps:
             self.eps = torch.nn.Parameter(torch.FloatTensor([init_eps]))
         else:

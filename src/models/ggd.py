@@ -5,7 +5,7 @@ import copy
 import random
 import dgl.function as fn
 from sklearn import preprocessing as sk_prep
-from gnn_modules import setup_module
+from src.gnn_modules import setup_module
 
 
 class model_ggd(nn.Module):
@@ -56,7 +56,7 @@ class model_ggd(nn.Module):
         for i, lin in enumerate(self.mlp):
             sc_1 = lin(sc_1)
             sc_2 = lin(sc_2)
-        
+
         sc_1 = sc_1.sum(1).unsqueeze(0)
         sc_2 = sc_2.sum(1).unsqueeze(0)
 

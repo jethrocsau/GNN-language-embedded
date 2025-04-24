@@ -2,13 +2,13 @@ import os
 
 import numpy as np
 import pandas as pd
-import ref.trainer_large as trainer_large
+import src.trainer_large as trainer_large
 import torch
 import torch.nn.functional as F
 from ogb.nodeproppred import DglNodePropPredDataset
 from torch import Tensor
 from transformers import AutoModel, AutoTokenizer
-from ref.utils.utils import set_random_seed,
+from src.utils.utils import set_random_seed
 import warnings
 import threading
 import queue

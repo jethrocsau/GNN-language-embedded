@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from typing import Optional
-from gnn_modules import setup_module
-from utils.augmentation import random_aug
+from src.gnn_modules import setup_module
+from src.utils.augmentation import random_aug
 import numpy as np
 import torch.nn.functional as F
 from dgl.nn import GraphConv

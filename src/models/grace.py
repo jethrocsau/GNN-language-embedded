@@ -2,8 +2,8 @@ import torch
 import torch.nn.functional as F
 import copy
 from typing import Optional
-from gnn_modules import setup_module
-from utils.augmentation import random_aug, drop_feature
+from src.gnn_modules import setup_module
+from src.utils.augmentation import random_aug, drop_feature
 import torch.distributed as dist
 import diffdist
 
@@ -28,11 +28,11 @@ class model_grace(torch.nn.Module):
             drop_feature_rate_2: float = 0.5,
             tau: float = 1e-3,
             top_k=1,
-            hhsize_time=1, 
+            hhsize_time=1,
             num_expert=4,
             moe=False,
             moe_use_linear=False,
-            decoder_no_moe=False, 
+            decoder_no_moe=False,
             moe_layer=None,
             deepspeed=False,
             graphmae2_ema_graph_nodrop=False
@@ -68,7 +68,7 @@ class model_grace(torch.nn.Module):
             residual=residual,
             norm=norm,
             top_k=top_k,
-            hhsize_time=hhsize_time, 
+            hhsize_time=hhsize_time,
             num_expert=num_expert,
             moe=moe,
             moe_use_linear=moe_use_linear,
@@ -89,8 +89,8 @@ class model_grace(torch.nn.Module):
         #graph_2 = graph2.add_self_loop()
 
 
-        #feat1 = drop_feature(x, self.drop_feature_rate_1) 
-        #feat2 = drop_feature(x, self.drop_feature_rate_2) 
+        #feat1 = drop_feature(x, self.drop_feature_rate_1)
+        #feat2 = drop_feature(x, self.drop_feature_rate_2)
         feat1 = drop_feat1
         feat2 = drop_feat2
         graph_1 = drop_g1
@@ -99,7 +99,7 @@ class model_grace(torch.nn.Module):
         else:
             graph_2 = drop_g2
         #graph_2 = drop_g2
-        
+
         z1 = self.embed(graph_1, feat1)
         z2 = self.embed(graph_2, feat2)
         #return self.loss(z1, z2)
@@ -116,7 +116,7 @@ class model_grace(torch.nn.Module):
         z1 = F.normalize(z1)
         z2 = F.normalize(z2)
         return torch.mm(z1, z2.t())
-        
+
     def semi_loss(self, z1: torch.Tensor, z2: torch.Tensor):
         f = lambda x: torch.exp(x / self.tau)
         refl_sim = f(self.sim(z1, z1))
@@ -173,4 +173,4 @@ class model_grace(torch.nn.Module):
         ret = ret.mean() if mean else ret.sum()
         return ret
 
-    
+

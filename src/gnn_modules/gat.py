@@ -5,10 +5,11 @@ from dgl.ops import edge_softmax
 import dgl.function as fn
 from dgl.utils import expand_as_pair
 import tqdm
-from gnn_modules.module_utils import create_activation,create_norm
-from fmoe import SSLfmoefy
+from src.gnn_modules.module_utils import create_activation,create_norm
+#from fastmoe.fmoe import SSLfmoefy
 from utils.utils import print_rank_0
 
+debug = True
 
 class GAT(nn.Module):
     def __init__(self,
@@ -197,14 +198,14 @@ class GATConv(nn.Module):
         self.norm = norm
         if norm is not None:
             self.norm = norm(num_heads * out_feats)
-        
-        #add MOE 
+
+        #add MOE
         if moe:
             print_rank_0("use moe bulid GAT")
-            if hasattr(self, 'fc') and self.fc!=None :
-                self.fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.fc.in_features, hidden_hidden_size=self.fc.in_features*hhsize_time ,d_outsize=self.fc.out_features, top_k=top_k, use_linear=moe_use_linear)
-            if hasattr(self, 'res_fc') and self.res_fc!=None :
-                self.res_fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.res_fc.in_features, hidden_hidden_size=self.res_fc.in_features*hhsize_time ,d_outsize=self.res_fc.out_features, top_k=top_k, use_linear=moe_use_linear)
+            #if hasattr(self, 'fc') and self.fc!=None :
+                #self.fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.fc.in_features, hidden_hidden_size=self.fc.in_features*hhsize_time ,d_outsize=self.fc.out_features, top_k=top_k, use_linear=moe_use_linear)
+            #if hasattr(self, 'res_fc') and self.res_fc!=None :
+                #self.res_fc = SSLfmoefy(moe_num_experts=num_expert, hidden_size=self.res_fc.in_features, hidden_hidden_size=self.res_fc.in_features*hhsize_time ,d_outsize=self.res_fc.out_features, top_k=top_k, use_linear=moe_use_linear)
 
     def reset_parameters(self):
         """

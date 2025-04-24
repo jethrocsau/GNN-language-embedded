@@ -8,8 +8,7 @@ import torch.nn.functional as F
 import dgl
 import numpy as np
 
-
-from gnn_modules import setup_module
+from src.gnn_modules import setup_module
 
 
 class model_graphmae(nn.Module):
@@ -35,11 +34,11 @@ class model_graphmae(nn.Module):
             alpha_l: float = 2,
             concat_hidden: bool = False,
             top_k=1,
-            hhsize_time=1, 
+            hhsize_time=1,
             num_expert=4,
             moe=True,
             moe_use_linear=False,
-            decoder_no_moe=False, 
+            decoder_no_moe=False,
             moe_layer=None
          ):
         super(model_graphmae, self).__init__()
@@ -51,7 +50,7 @@ class model_graphmae(nn.Module):
         self._drop_edge_rate = drop_edge_rate
         self._output_hidden_size = num_hidden
         self._concat_hidden = concat_hidden
-        
+
         self._replace_rate = replace_rate
         self._mask_token_rate = 1 - self._replace_rate
 
@@ -65,7 +64,7 @@ class model_graphmae(nn.Module):
             enc_nhead = 1
 
         dec_in_dim = num_hidden
-        dec_num_hidden = num_hidden // nhead_out if decoder_type in ("gat", "dotgat") else num_hidden 
+        dec_num_hidden = num_hidden // nhead_out if decoder_type in ("gat", "dotgat") else num_hidden
 
         # build encoder
         self.encoder = setup_module(
@@ -85,7 +84,7 @@ class model_graphmae(nn.Module):
             residual=residual,
             norm=norm,
             top_k=top_k,
-            hhsize_time=hhsize_time, 
+            hhsize_time=hhsize_time,
             num_expert=num_expert,
             moe=moe,
             moe_use_linear=moe_use_linear,
@@ -110,7 +109,7 @@ class model_graphmae(nn.Module):
             norm=norm,
             concat_out=True,
             top_k=top_k,
-            hhsize_time=hhsize_time, 
+            hhsize_time=hhsize_time,
             num_expert=num_expert,
             moe=moe if decoder_no_moe==False else False ,
             moe_use_linear = moe_use_linear,
@@ -122,7 +121,7 @@ class model_graphmae(nn.Module):
             self.encoder_to_decoder = nn.Linear(dec_in_dim * num_layers, dec_in_dim, bias=False)
         else:
             self.encoder_to_decoder = nn.Linear(dec_in_dim, dec_in_dim, bias=False)
-            
+
         # * setup loss function
         self.criterion = self.setup_loss_fn(loss_fn, alpha_l)
 
@@ -138,7 +137,7 @@ class model_graphmae(nn.Module):
         else:
             raise NotImplementedError
         return criterion
-    
+
     def encoding_mask_noise(self, g, x, mask_rate=0.3):
         num_nodes = g.num_nodes()
         perm = torch.randperm(num_nodes, device=x.device)
@@ -196,7 +195,7 @@ class model_graphmae(nn.Module):
         x_init = x[mask_nodes]
         x_rec = recon[mask_nodes]
         #test
-        if dataset_ids is not None:  
+        if dataset_ids is not None:
             loss, loss_list = sce_loss_seq_calulate(x_rec, x_init, alpha=self.alpha_l)
             #print(loss_list)
             #print(loss_list.shape)
@@ -205,13 +204,13 @@ class model_graphmae(nn.Module):
             loss_dict = {}
             for i in range(np.max(dataset_ids)+1):
                 if len(np.where(node2dataset==i)[0])>0:
-                    loss_dict[i] = loss_list[np.where(node2dataset==i)[0]].mean().item()    
-                            
+                    loss_dict[i] = loss_list[np.where(node2dataset==i)[0]].mean().item()
+
             return loss, loss_dict
         else:
             loss = self.criterion(x_rec, x_init)
             return loss
-        # test end 
+        # test end
 
     def embed(self, g, x):
         rep = self.encoder(g, x)
@@ -220,7 +219,7 @@ class model_graphmae(nn.Module):
     @property
     def enc_params(self):
         return self.encoder.parameters()
-    
+
     @property
     def dec_params(self):
         return chain(*[self.encoder_to_decoder.parameters(), self.decoder.parameters()])

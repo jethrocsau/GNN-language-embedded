@@ -5,7 +5,7 @@ import torch
 import torch.distributed as dist
 import os
 # models
-from models import build_model
+from src.models import build_model
 
 # self-made utils
 from utils.load_data import load_dataloader, LinearProbingDataLoader, setup_incontext_dataloader
@@ -48,7 +48,7 @@ def get_save_path_name(args,pretrain_seed):
     if args.moe_use_linear:
         assert args.moe==True
         model_name = model_name+"_linear"
-    
+
     if args.moe:
         if args.moe_layer==None:
             moe_layer_name = "_lall"
@@ -57,17 +57,17 @@ def get_save_path_name(args,pretrain_seed):
             for l in args.moe_layer:
                 moe_layer_name = moe_layer_name+f"{l}"
         model_name = model_name+moe_layer_name
-    
+
     for x in args.pretrain_dataset:
         model_name = model_name + "_" + short_title[x]
-        
+
     if args.weight == None:
         w_name = "None_"
     else:
         w_name = ""
         for w in args.weight:
             w_name = w_name + f"{w}_"
-    
+
     if args.model in ["graphmae","graphmae2"]:
         model_name = model_name + f"_weights_{w_name}pseed_{pretrain_seed}_topk_{args.top_k}_numexp_{args.num_expert}_hstime_{args.hiddenhidden_size_times}_mask_{args.mask_rate}_alpha_{args.alpha_l}_GNNlayers_{args.num_layers}_lr_{args.lr}_decay_{args.weight_decay}_epoch_{args.max_epoch}_edgedrop_{args.drop_edge_rate}_method_{short_title[args.drop_model]}_"
     elif args.model in ["grace"]:
@@ -91,21 +91,21 @@ def get_save_path_name(args,pretrain_seed):
     if args.no_scale:
         model_name = model_name+ "no_scale_"
     else:
-        model_name = model_name+ "scale_" 
+        model_name = model_name+ "scale_"
 
     if args.default_dataset!=None:
-        model_name = model_name + f"samplebase_{args.default_dataset}_"    
-    
+        model_name = model_name + f"samplebase_{args.default_dataset}_"
+
     if args.feat_type in ["e5_float16","e5_float32"]:
-        model_name = model_name + f"e5_" 
-    elif args.feat_type in ["ofa_float16","ofa_float32"]:  
-        model_name = model_name + f"ofa_" 
+        model_name = model_name + f"e5_"
+    elif args.feat_type in ["ofa_float16","ofa_float32"]:
+        model_name = model_name + f"ofa_"
     else:
         raise ValueError
-    
+
     model_name = model_name + args.encoder + "_"
 
-    model_name = model_name + "checkpoint"        
+    model_name = model_name + "checkpoint"
     return model_name
 
 def data_loading_thread(data_queue, dataloader):
@@ -116,7 +116,7 @@ class ModelTrainer:
     def __init__(self, args):
         self._args = args
         self._device = args.device if args.device >= 0 else "cpu"
-    
+
     def train_eval(self,pretrain_seed=0):
         args = self._args
         set_random_seed(pretrain_seed)
@@ -125,7 +125,7 @@ class ModelTrainer:
 
         print_rank_0(args)
         #
-        if args.moe: 
+        if args.moe:
             project_name = f"{args.model}-mixpretrain+moe"
         elif args.few_shot:
             project_name = f"{args.model}-fewshot-{args.dataset}"
@@ -133,28 +133,28 @@ class ModelTrainer:
             project_name = f"{args.model}-mixpretrain"
         #
         if torch.distributed.is_initialized():
-            if torch.distributed.get_rank() == 0:  
+            if torch.distributed.get_rank() == 0:
                 wandb.init(project=f"SSL-{args.dataset}",name=project_name ,config=vars(args),dir="../")
         else:
-            wandb.init(project=f"SSL-{args.dataset}",name=project_name ,config=vars(args),dir="../")      
-        self._args = args  
+            wandb.init(project=f"SSL-{args.dataset}",name=project_name ,config=vars(args),dir="../")
+        self._args = args
 
         memory_before_load = show_occupied_memory()
         if not args.load_model :
             self._pretrain_dataloader = load_dataloader("pretrain", args.dataset, self._args, pretrain_seed=pretrain_seed)
             self._args.ema_total_steps = len(self._pretrain_dataloader)*self._args.max_epoch
             args.ema_total_steps = len(self._pretrain_dataloader)*self._args.max_epoch
-            
+
         if args.feat_type in ["e5_float16","e5_float32"]:
             self._args.num_features = 384
-        elif args.feat_type in ["ofa_float16","ofa_float32"]: 
+        elif args.feat_type in ["ofa_float16","ofa_float32"]:
             self._args.num_features = 768
-        elif args.feat_type in ["origin_float16","origin_float32"]: 
+        elif args.feat_type in ["origin_float16","origin_float32"]:
             self._args.num_features = 128
         else:
             raise ValueError
         print_rank_0(f"Data memory usage: {show_occupied_memory() - memory_before_load:.2f} MB")
-        
+
         self.model = build_model(self._args)
         self.optimizer = create_optimizer(args.optimizer, self.model, args.lr, args.weight_decay)
         self.scheduler = None
@@ -163,8 +163,8 @@ class ModelTrainer:
         if args.deepspeed:
             self.model, self.optimizer, _, _ = deepspeed.initialize(
                         args=args,
-                        model=self.model, 
-                        optimizer=self.optimizer, 
+                        model=self.model,
+                        optimizer=self.optimizer,
                         lr_scheduler=self.scheduler
                     )
         else:
@@ -176,11 +176,11 @@ class ModelTrainer:
             if args.deepspeed:
                 ckpt_dir = os.path.join(args.data_dir ,args.save_model_path, "ds_" + get_save_path_name(args,pretrain_seed))
             else:
-                ckpt_dir = os.path.join(args.data_dir ,args.save_model_path)   
+                ckpt_dir = os.path.join(args.data_dir ,args.save_model_path)
             os.makedirs(args.data_dir, exist_ok=True)
             os.makedirs(os.path.join(args.data_dir ,args.save_model_path), exist_ok=True)
             os.makedirs(ckpt_dir, exist_ok=True)
-           
+
             self.pretrain(ckpt_dir)
 
             if args.save_model:
@@ -198,7 +198,7 @@ class ModelTrainer:
         else:
             print(f"Loading model from {args.load_model_path}")
             self.model.load_state_dict(torch.load(args.load_model_path))
-        
+
         if args.deepspeed:
             print("pretrain finished")
             exit(0)
@@ -250,7 +250,7 @@ class ModelTrainer:
 
                 epoch_iter.set_description(f"# Epochs {epoch}: train_loss: {loss.item():.4f}")
                 losses.append(loss.item())
-                                 
+
                 if args.deepspeed:
                     world_size = dist.get_world_size()
                     values = [loss.item()]
@@ -261,7 +261,7 @@ class ModelTrainer:
                 else:
                     wandb.log({"pretrain/loss": loss.item()})
                 step+=1
- 
+
             if args.deepspeed:
                 client_sd["step"] = step
                 client_sd["epoch"] = epoch
@@ -298,7 +298,7 @@ class ModelTrainer:
                             dataset_ids[targets[idx]:targets[idx+1]] = context_nodes_dataset_id[idx]
                         else:
                             dataset_ids[targets[idx]:] = context_nodes_dataset_id[idx]
-                               
+
                     loss, loss_dict = self.model(batch_g, feats, drop_g, dataset_ids=dataset_ids)
                     log_dict = {}
                     for key, value in loss_dict.items():
@@ -322,12 +322,12 @@ class ModelTrainer:
                             dataset_ids[targets[idx]:targets[idx+1]] = context_nodes_dataset_id[idx]
                         else:
                             dataset_ids[targets[idx]:] = context_nodes_dataset_id[idx]
-            
+
                     loss, loss_dict = self.model(batch_g, feats, dataset_ids=dataset_ids)
                     log_dict = {}
                     for key, value in loss_dict.items():
                         log_dict["pretrain/"+args.pretrain_dataset[key]+"-loss"] = value
-                    
+
                     if args.deepspeed:
                         if dist.get_rank() == 0:
                             wandb.log(log_dict)
@@ -356,8 +356,8 @@ class ModelTrainer:
             else:
                 loss = self.model(batch_g, drop_feat1, drop_feat2, drop_g1, drop_g2)
         else:
-            raise ValueError    
-       
+            raise ValueError
+
         return loss
 
     def infer_embeddings(self):  # preparing embeddings and labels
@@ -443,7 +443,7 @@ class ModelTrainer:
                     num_no_improve = 0
                 else:
                     num_no_improve = num_no_improve +1
-                
+
                 if num_no_improve>300:
                     break
 
@@ -474,16 +474,16 @@ class ModelTrainer:
 
     def incontext_evaluate(self):
         args = self._args
-        device = args.device      
+        device = args.device
         dataset_name = args.dataset
         node_classify_task = ["ogbn-arxiv","Cora","Pubmed"]
         link_predict_task = ["FB15K237","WN18RR"]
         print(f"{args.eval_num_label}-ways, {args.eval_num_support}-shots, {args.eval_num_query}-querys, {args.khop}-khop, {args.total_steps}-total_steps")
         acc_list = []
-        
+
         if dataset_name in link_predict_task:
             args.num_hidden = args.num_hidden*2
-         
+
         for i, seed in enumerate(args.linear_prob_seeds):
             print(f"####### Run In-Context Evaluation #######")
             set_random_seed(seed)
