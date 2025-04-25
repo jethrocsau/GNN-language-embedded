@@ -3,7 +3,7 @@ from argparse import Namespace
 
 import torch
 from dgl.dataloading import GraphDataLoader
-
+from dgl.data.utils import save_graphs
 import utils.data_utils as du
 from utils.data_utils import GraphAlign_e5, load_ogb_dataset, open_pickle
 
@@ -13,17 +13,18 @@ if env=='terminal':
     cwd = os.getcwd()
 else:
     cwd = os.path.dirname(__file__)
+
+# set foldrs
 model_path = os.path.join(cwd, 'model', 'GraphAlign_graphmae.pt')
 config_path = os.path.join(cwd, 'src', 'config', 'GraphMAE_configs.yml')
 data_dir = os.path.join(cwd, 'data')
-
 
 # cuda device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # datset names
 dataset_names = ['ogbn-mag','ogbn-arxiv']
-idx_dataset = 2
+idx_dataset = 1
 
 # set arguments
 args = Namespace(
@@ -83,14 +84,16 @@ args = Namespace(
 
 # create & load model
 model = GraphAlign_e5(args)
-model.load_model()
+model.prepare_data()
 
-# get embeddings
-node_titles = model.get_nodeidx_mappings()
-node_feat_e5 = model.generate_e5_embeddings()
+# infer graph alignment embeddings
+embedding = model.infer_graphalign()
 
+# save generated embeddings
+dataset_name = dataset_names[idx_dataset]
+processed_dir = os.path.join(cwd, 'processed')
+if not os.path.exists(processed_dir):
+    os.makedirs(processed_dir)
 
-# save embedding
-#if not os.path.exists(os.path.join(cwd, 'embedding')):
-#    os.makedirs(os.path.join(cwd, 'embedding'))
-#    torch.save(embedding, os.path.join(cwd, 'embedding', 'embedding.pt'))
+#save graph model
+save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph)

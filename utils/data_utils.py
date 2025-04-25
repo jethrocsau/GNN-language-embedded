@@ -129,7 +129,7 @@ class GraphAlign_e5(ModelTrainer):
             batch = input_texts[i:i + batch_size]
             batch_embeddings = model.encode(batch, normalize_embeddings=True)
             embeddings.extend(batch_embeddings)
-        self.node_feat_e5 = torch.tensor(embeddings, dtype=torch.float16).to(device)
+        self.node_feat_e5 = torch.tensor(embeddings, dtype=torch.float32).to(device)
         if return_val:
             return self.node_feat_e5.cpu().numpy()
 
@@ -137,39 +137,32 @@ class GraphAlign_e5(ModelTrainer):
         self.load_model()
         self.get_nodeidx_mappings(return_val=False)
         self.generate_e5_embeddings(return_val=False)
-        self.graph.ndata['feat'] = self.node_feat_e5
         self.graph = self.graph.to(self._args.device)
+        self.graph.ndata['e5_feat'] = self.node_feat_e5
 
-    def infer_graphalign(self):
-        args = self._args
-        data_queue = queue.Queue(maxsize=15)
-        self._eval_dataloader = GraphDataLoader(
-            self.graph,
-            self.train_idx,
-            batch_size=args.batch_size_f,
-            shuffle=False,
-            drop_last=False
-        )
 
-        #num_info, label_info, self._eval_dataloader = load_dataloader("eval", args.dataset, args)
-        # run inference on embedding
+    def infer_graphalign(self, return_val = True):
+        self.model.eval()
+        num_nodes = self.graph.num_nodes()
+        batch_size = self._args.batch_size_f
         with torch.no_grad():
-            data_thread = threading.Thread(target=data_loading_thread, args=(data_queue,self._eval_dataloader,))
-            data_thread.start()
-            epoch_iter = tqdm(range(len(self._eval_dataloader)))
-            self.model.to(self._device)
-            self.model.eval()
-            embeddings = []
-            for idx in epoch_iter:
-                batch = data_queue.get()
-                batch_g, targets, _, node_idx = batch
-                batch_g = batch_g.to(self._device)
-                x = batch_g.ndata.pop("feat").to(self._device)
-                targets = targets.to(self._device)
-                batch_emb = self.model.embed(batch_g, x)[targets]
-                embeddings.append(batch_emb.cpu())
+            #init features
+            all_embeddings = []
+            x = self.graph.ndata.pop("e5_feat").to(self._device)
 
-        return torch.cat(embeddings, dim=0)
+            # Process in batches
+            for start_idx in tqdm(range(0, num_nodes, batch_size), desc="Processing batches"):
+                end_idx = min(start_idx + batch_size, num_nodes)
+                batch_nodes = torch.arange(start_idx, end_idx).to(self._device)
+                batch_emb = self.model.embed(self.graph, x)[batch_nodes]
+                all_embeddings.append(batch_emb.cpu())
+            torch_embedding = torch.cat(all_embeddings, dim=0).to(self._device)
+
+        # add embedding to graph
+        self.graph = self.graph.to(self._args.device)
+        self.graph.ndata['ga_embedding'] = torch_embedding
+        if return_val:
+            return torch_embedding.cpu().numpy()
 
     def prepare_dataset(self):
         split_idx = self.dataset.get_idx_split()
@@ -178,7 +171,6 @@ class GraphAlign_e5(ModelTrainer):
 def data_loading_thread(data_queue, dataloader):
     for batch in dataloader:
         data_queue.put(batch)
-
 
 def open_pickle(file_path):
     with open(file_path, 'rb') as f:
