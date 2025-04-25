@@ -1,2 +1,5 @@
 *.tsv
 data/.DS_Store
+.DS_Store
+fastmoe/
+.DS_Store

@@ -70,7 +70,6 @@ def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropo
             encoding=(enc_dec == "encoding"),
         )
     elif m_type == "gcn":
-        '''
         mod = GCN(
             in_dim=in_dim,
             num_hidden=num_hidden,
@@ -88,7 +87,6 @@ def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropo
             moe_use_linear=moe_use_linear,
             moe_layer=moe_layer
         )
-        '''
     elif m_type == "mlp":
         # * just for decoder
         mod = nn.Sequential(
