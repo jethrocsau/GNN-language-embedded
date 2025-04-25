@@ -97,3 +97,7 @@ if not os.path.exists(processed_dir):
 
 #save graph model
 save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label})
+
+# save graphalign embeddings pt
+embeddings = model.graph.ndata['ga_embedding'].cpu()
+torch.save(embeddings, os.path.join(processed_dir, f'{dataset_name}_graphalign_embeddings.pt'))
