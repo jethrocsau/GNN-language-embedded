@@ -1,10 +1,11 @@
 import os
+import pickle
 import queue
 import threading
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import pickle
+
 import numpy as np
 import pandas as pd
 import torch
@@ -28,7 +29,7 @@ data_dir = os.path.join(cwd, 'data')
 model_path = os.path.join(model_dir, 'GraphAlign_graphmae.pt')
 stark_path = os.path.join(data_dir, 'stark-mag')
 
-# stark values
+# mapping values
 STARK_FILES = {
     "edge_index": "edge_index.pt",
     "edge_types": "edge_types.pt",
@@ -36,6 +37,10 @@ STARK_FILES = {
     "edge_type_dict": "edge_type_dict.pkl",
     "node_info": "node_info.pkl",
     "node_types": "node_types.pt"
+}
+MAPPING_FILES = {
+    'ogbn-arxiv': os.path.join(data_dir, 'nodeidx2paperid.csv.gz'),
+    'ogbn-mag': os.path.join(data_dir, 'paper_entidx2name.csv.gz')
 }
 
 # Model parameters
@@ -92,8 +97,9 @@ class GraphAlign_e5(ModelTrainer):
             self.model.load_state_dict(torch.load(self._args.load_model_path))
 
     def get_nodeidx_mappings(self, return_val = True):
+        node_idx_file = MAPPING_FILES[self._args.dataset]
         node_idx = pd.read_csv(
-            os.path.join(data_dir,'nodeidx2paperid.csv.gz'),
+            node_idx_file,
             sep=',', compression='gzip',
             header=0,
             names=['node_idx', 'paper_id']
