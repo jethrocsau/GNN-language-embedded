@@ -120,7 +120,8 @@ class GraphAlign_e5(ModelTrainer):
 
     def generate_e5_embeddings(self, return_val = True):
         # Load the E5 model and tokenizer
-        input_texts = self.node_titles['title'].to_list()
+        self.node_titles['text'] = self.node_titles['title'] + ' ' + self.node_titles['abstract'].fillna('')
+        input_texts = self.node_titles['text'].to_list()
         model_name = MODEL_NAME["e5"]
         model = SentenceTransformer(model_name, device = device)
         batch_size = 64
@@ -148,7 +149,7 @@ class GraphAlign_e5(ModelTrainer):
         with torch.no_grad():
             #init features
             all_embeddings = []
-            x = self.graph.ndata.pop("e5_feat").to(self._device)
+            x = self.graph.ndata['e5_feat'].clone().to(self._device)
 
             # Process in batches
             for start_idx in tqdm(range(0, num_nodes, batch_size), desc="Processing batches"):
