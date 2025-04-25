@@ -1,12 +1,17 @@
-from utils.data_utils import GraphAlign_e5, load_ogb_dataset
 import os
-import torch
 from argparse import Namespace
+
+import torch
 from dgl.dataloading import GraphDataLoader
 
+from utils.data_utils import GraphAlign_e5, load_ogb_dataset
 
+env = 'terminal'
 # set params
-cwd = os.path.dirname(__file__)
+if env=='terminal':
+    cwd = os.cwd()
+else:
+    cwd = os.path.dirname(__file__)
 model_path = os.path.join(cwd, 'model', 'GraphAlign_graphmae.pt')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 config_path = os.path.join(cwd, 'src', 'config', 'GraphMAE_configs.yml')
@@ -71,9 +76,13 @@ args = Namespace(
 # create & load model
 model = GraphAlign_e5(args)
 model.load_model()
-embedding = model.infer_embeddings() #numpy
+
+# get embeddings
+node_titles = model.get_nodeidx_mappings()
+node_feat_e5 = model.generate_e5_embeddings()
+
 
 # save embedding
-if not os.path.exists(os.path.join(cwd, 'embedding')):
-    os.makedirs(os.path.join(cwd, 'embedding'))
-    torch.save(embedding, os.path.join(cwd, 'embedding', 'embedding.pt'))
+#if not os.path.exists(os.path.join(cwd, 'embedding')):
+#    os.makedirs(os.path.join(cwd, 'embedding'))
+#    torch.save(embedding, os.path.join(cwd, 'embedding', 'embedding.pt'))

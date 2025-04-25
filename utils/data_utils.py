@@ -1,27 +1,30 @@
 import os
-from src.trainer_large import ModelTrainer, build_model
+import queue
+import threading
+import time
+import warnings
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import numpy as np
 import pandas as pd
-import src.trainer_large as trainer_large
 import torch
 import torch.nn.functional as F
-from ogb.nodeproppred import DglNodePropPredDataset
-from torch import Tensor
-from transformers import AutoModel, AutoTokenizer
-from src.utils.utils import set_random_seed
-import warnings
-import threading
-import queue
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
 from dgl.dataloading import GraphDataLoader
-import tqdm
+from ogb.nodeproppred import DglNodePropPredDataset
+from sentence_transformers import SentenceTransformer
+from torch import Tensor
+from tqdm import tqdm
+from transformers import AutoModel, AutoTokenizer
+
+from src.trainer_large import ModelTrainer, build_model
+from src.utils.utils import set_random_seed
 
 # Global variables
 dataset_names = ['ogbn-mag','ogbn-arxiv','ogbn-products']
 utils_path = os.path.dirname(os.path.abspath(__file__))
 cwd = os.path.dirname(utils_path)
 model_dir = os.path.join(cwd, 'model')
+data_dir = os.path.join(cwd, 'data')
 model_path = os.path.join(model_dir, 'GraphAlign_graphmae.pt')
 
 # Model parameters
@@ -78,8 +81,49 @@ class GraphAlign_e5(ModelTrainer):
             print(f"Loading model from {self._args.load_model_path}")
             self.model.load_state_dict(torch.load(self._args.load_model_path))
 
+    def get_nodeidx_mappings(self, return_val = True):
+        node_idx = pd.read_csv(
+            os.path.join(data_dir,'nodeidx2paperid.csv.gz'),
+            sep=',', compression='gzip',
+            header=0,
+            names=['node_idx', 'paper_id']
+        )
+        node_idx['paper_id'] = node_idx['paper_id'].astype(np.int64)
+        idx_title = pd.read_csv(
+            os.path.join(data_dir,'titleabs.tsv.gz'),
+            sep='\t',
+            compression='gzip',
+            header=0,
+            names=['title', 'abstract'],
+            dtype={'title': str, 'abstract': str}
+        )
+        self.node_titles = node_idx.merge(idx_title.reset_index(), left_on='paper_id', right_on='index', how='inner')
+        if return_val:
+            return self.node_titles
 
-    def infer_embeddings(self):
+
+    def generate_e5_embeddings(self, return_val = True):
+        # Load the E5 model and tokenizer
+        input_texts = self.node_titles['title'].to_list()
+        model_name = MODEL_NAME["e5"]
+        model = SentenceTransformer(model_name, device = device)
+        batch_size = 64
+        embeddings = []
+        for i in tqdm(range(0, len(input_texts), batch_size), desc="Encoding Progress"):
+            batch = input_texts[i:i + batch_size]
+            batch_embeddings = model.encode(batch, normalize_embeddings=True)
+            embeddings.extend(batch_embeddings)
+        self.node_feat_e5 = torch.tensor(embeddings, dtype=torch.float16).to(device)
+        if return_val:
+            return self.node_feat_e5.cpu().numpy()
+
+    def prepare_data(self):
+        self.get_nodeidx_mappings(return_val=False)
+        self.generate_e5_embeddings(return_val=False)
+        self.graph.ndata['feat'] = self.node_feat_e5
+        self.graph = self.graph.to(self._args.device)
+
+    def infer_graphalign(self):
         args = self._args
         data_queue = queue.Queue(maxsize=15)
         self._eval_dataloader = GraphDataLoader(
@@ -117,6 +161,5 @@ class GraphAlign_e5(ModelTrainer):
 def data_loading_thread(data_queue, dataloader):
     for batch in dataloader:
         data_queue.put(batch)
-
 
 
