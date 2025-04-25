@@ -4,7 +4,7 @@ import threading
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+import pickle
 import numpy as np
 import pandas as pd
 import torch
@@ -26,6 +26,17 @@ cwd = os.path.dirname(utils_path)
 model_dir = os.path.join(cwd, 'model')
 data_dir = os.path.join(cwd, 'data')
 model_path = os.path.join(model_dir, 'GraphAlign_graphmae.pt')
+stark_path = os.path.join(data_dir, 'stark-mag')
+
+# stark values
+STARK_FILES = {
+    "edge_index": "edge_index.pt",
+    "edge_types": "edge_types.pt",
+    "node_type_dict": "node_type_dict.pkl",
+    "edge_type_dict": "edge_type_dict.pkl",
+    "node_info": "node_info.pkl",
+    "node_types": "node_types.pt"
+}
 
 # Model parameters
 MODEL_NAME={"e5":"intfloat/e5-small-v2"}
@@ -40,7 +51,6 @@ def load_ogb_dataset(name):
     Input: dataset name
     Output: graph, labels, train_idx, valid_idx, test_idx
     """
-
     data_dir = os.path.join(cwd, 'data')
     print(f"Dataset directory: {data_dir}")
     if not os.path.exists(data_dir):
@@ -117,7 +127,8 @@ class GraphAlign_e5(ModelTrainer):
         if return_val:
             return self.node_feat_e5.cpu().numpy()
 
-    def prepare_data(self):
+    def prepare_data(self, return_val = True):
+        self.load_model()
         self.get_nodeidx_mappings(return_val=False)
         self.generate_e5_embeddings(return_val=False)
         self.graph.ndata['feat'] = self.node_feat_e5
@@ -162,4 +173,9 @@ def data_loading_thread(data_queue, dataloader):
     for batch in dataloader:
         data_queue.put(batch)
 
+
+def open_pickle(file_path):
+    with open(file_path, 'rb') as f:
+        data = pickle.load(f)
+    return data
 

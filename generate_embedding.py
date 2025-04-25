@@ -4,22 +4,28 @@ from argparse import Namespace
 import torch
 from dgl.dataloading import GraphDataLoader
 
-from utils.data_utils import GraphAlign_e5, load_ogb_dataset
+from utils.data_utils import GraphAlign_e5, load_ogb_dataset, open_pickle
 
-env = 'terminal'
 # set params
+env = 'terminal'
 if env=='terminal':
-    cwd = os.cwd()
+    cwd = os.getcwd()
 else:
     cwd = os.path.dirname(__file__)
 model_path = os.path.join(cwd, 'model', 'GraphAlign_graphmae.pt')
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 config_path = os.path.join(cwd, 'src', 'config', 'GraphMAE_configs.yml')
 data_dir = os.path.join(cwd, 'data')
 
+# cuda device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# datset names
+dataset_names = ['ogbn-mag','ogbn-arxiv','ogbn-products']
+idx_dataset = 2
+
 # set arguments
 args = Namespace(
-    dataset='ogbn-arxiv',
+    dataset=dataset_names[idx_dataset],
     model='graphmae',
     use_cfg=True,
     device=0,
