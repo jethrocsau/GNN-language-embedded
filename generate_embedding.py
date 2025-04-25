@@ -96,4 +96,4 @@ if not os.path.exists(processed_dir):
     os.makedirs(processed_dir)
 
 #save graph model
-save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph)
+save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label})
