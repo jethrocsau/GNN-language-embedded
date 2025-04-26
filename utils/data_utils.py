@@ -114,6 +114,7 @@ class GraphAlign_e5(ModelTrainer):
             dtype={'title': str, 'abstract': str}
         )
         self.node_titles = node_idx.merge(idx_title.reset_index(), left_on='paper_id', right_on='index', how='inner')
+        #Here "inner" may cause problem when processing dataset mag, better use "left", and check whether how many None in the title and abstract attribute.
         if return_val:
             return self.node_titles
 
@@ -140,6 +141,8 @@ class GraphAlign_e5(ModelTrainer):
         self.generate_e5_embeddings(return_val=False)
         self.graph = self.graph.to(self._args.device)
         self.graph.ndata['e5_feat'] = self.node_feat_e5
+        #Here "e5_feat" is the normal embedding, and later generated graphalign embedding is saved to self.graph.ndata['ga_embedding']
+        #We can load the datasetName_graph.bin to get the normal embedding.
 
 
     def infer_graphalign(self, return_val = True):
