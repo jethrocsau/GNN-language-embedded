@@ -14,6 +14,7 @@ if env=='terminal':
 else:
     cwd = os.path.dirname(__file__)
 
+
 # set foldrs
 model_path = os.path.join(cwd, 'model', 'GraphAlign_graphmae.pt')
 config_path = os.path.join(cwd, 'src', 'config', 'GraphMAE_configs.yml')
@@ -64,7 +65,7 @@ args = Namespace(
     weight_decay_f=1e-4,
     lr_f=0.001,
     max_epoch_f=1000,
-    batch_size_f=256,
+    batch_size_f=10000,
     scheduler=True,
     loss_fn='sce',
     optimizer='adamw',
@@ -84,10 +85,10 @@ args = Namespace(
 
 # create & load model
 model = GraphAlign_e5(args)
-model.prepare_data()
+e5_embedding = model.prepare_data()
 
 # infer graph alignment embeddings
-embedding = model.infer_graphalign()
+ga_embeddings = model.infer_graphalign()
 
 # save generated embeddings
 dataset_name = dataset_names[idx_dataset]
@@ -96,8 +97,20 @@ if not os.path.exists(processed_dir):
     os.makedirs(processed_dir)
 
 #save graph model
-save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label})
+if dataset_names[idx_dataset]== 'ogbn-arxiv':
+    save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label})
+elif dataset_names[idx_dataset]== 'ogbn-mag':
+    save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label['paper']})
 
 # save graphalign embeddings pt
-embeddings = model.graph.ndata['ga_embedding'].cpu()
-torch.save(embeddings, os.path.join(processed_dir, f'{dataset_name}_graphalign_embeddings.pt'))
+torch.save(
+    e5_embedding,
+    os.path.join(processed_dir, f'{dataset_name}_e5_embeddings.pt'),
+    pickle_protocol=4  # Specify protocol 4
+)
+
+torch.save(
+    ga_embeddings,
+    os.path.join(processed_dir, f'{dataset_name}_graphalign_embeddings.pt'),
+    pickle_protocol=4  # Specify protocol 4
+)

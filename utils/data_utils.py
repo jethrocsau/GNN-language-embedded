@@ -139,6 +139,7 @@ class GraphAlign_e5(ModelTrainer):
             raise ValueError(f"Dataset {self._args.dataset} not supported.")
 
     def generate_e5_embeddings(self, return_val = True):
+        print("Generating E5 embeddings...")
         # Load the E5 model and tokenizer
         #ogbn doesnt have abstract column so I will just work with titles
         #self.node_titles['text'] = self.node_titles['title'] + ' ' + self.node_titles['abstract'].fillna('')
@@ -155,7 +156,6 @@ class GraphAlign_e5(ModelTrainer):
                 batch_embeddings = model.encode(batch, normalize_embeddings=True)
                 embeddings.extend(batch_embeddings)
             except Exception as e:
-                print(f"Error in batch {e}: Retrying with individual texts")
                 # loop individually to get embeddings within batch
                 for text in batch:
                     try:
@@ -178,12 +178,15 @@ class GraphAlign_e5(ModelTrainer):
             self.graph.ndata['e5_feat'] = self.node_feat_e5
         elif self._args.dataset == 'ogbn-mag':
             self.graph.nodes['paper'].data['e5_feat'] = self.node_feat_e5
+
+        if return_val:
+            return self.node_feat_e5
         #Here "e5_feat" is the normal embedding, and later generated graphalign embedding is saved to self.graph.ndata['ga_embedding']
         #We can load the datasetName_graph.bin to get the normal embedding.
 
     def infer_graphalign(self, return_val = True):
+        print("Generating GraphAlign embeddings...")
         self.model.eval()
-        num_nodes = self.graph.num_nodes()
         batch_size = self._args.batch_size_f
         with torch.no_grad():
             #init features
@@ -192,10 +195,12 @@ class GraphAlign_e5(ModelTrainer):
             # prepare data
             if self._args.dataset == 'ogbn-arxiv':
                 x = self.graph.ndata['e5_feat'].clone().to(self._device)
+                num_nodes = len(x)
                 g = self.graph
             elif self._args.dataset == 'ogbn-mag':
                 x = self.graph.nodes['paper'].data['e5_feat'].clone().to(self._device)
                 paper_edges = ('paper', 'cites', 'paper')
+                num_nodes = len(x)
                 g = self.graph.edge_type_subgraph([paper_edges])
 
             # Process in batches
@@ -203,12 +208,16 @@ class GraphAlign_e5(ModelTrainer):
                 end_idx = min(start_idx + batch_size, num_nodes)
                 batch_nodes = torch.arange(start_idx, end_idx).to(self._device)
                 batch_emb = self.model.embed(g, x)[batch_nodes]
-                all_embeddings.extend(batch_emb.cpu())
+                all_embeddings.append(batch_emb.cpu())
             torch_embedding = torch.cat(all_embeddings, dim=0).to(self._device)
 
         # add embedding to graph
         self.graph = self.graph.to(self._args.device)
-        self.graph.ndata['ga_embedding'] = torch_embedding
+        if self._args.dataset == 'ogbn-arxiv':
+            self.graph.ndata['ga_embedding'] = torch_embedding
+        elif self._args.dataset == 'ogbn-mag':
+            self.graph.nodes['paper'].data['ga_embedding'] = torch_embedding
+
         if return_val:
             return torch_embedding.cpu().numpy()
 
@@ -265,3 +274,6 @@ def process_papers(path):
     node_titles.to_csv(os.path.join(data_dir, 'mag-nodeidx2titles.csv'), index=False)
 
     return node_titles
+
+def pulse_check():
+        print("Process is still running...")
