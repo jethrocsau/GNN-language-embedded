@@ -24,7 +24,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # datset names
 dataset_names = ['ogbn-mag','ogbn-arxiv']
-idx_dataset = 1
+idx_dataset = 0
 
 # set arguments
 args = Namespace(

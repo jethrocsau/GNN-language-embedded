@@ -97,31 +97,53 @@ class GraphAlign_e5(ModelTrainer):
             self.model.load_state_dict(torch.load(self._args.load_model_path))
 
     def get_nodeidx_mappings(self, return_val = True):
-        node_idx_file = MAPPING_FILES[self._args.dataset]
-        node_idx = pd.read_csv(
-            node_idx_file,
-            sep=',', compression='gzip',
-            header=0,
-            names=['node_idx', 'paper_id']
-        )
-        node_idx['paper_id'] = node_idx['paper_id'].astype(np.int64)
-        idx_title = pd.read_csv(
-            os.path.join(data_dir,'titleabs.tsv.gz'),
-            sep='\t',
-            compression='gzip',
-            header=0,
-            names=['title', 'abstract'],
-            dtype={'title': str, 'abstract': str}
-        )
-        self.node_titles = node_idx.merge(idx_title.reset_index(), left_on='paper_id', right_on='index', how='inner')
-        #Here "inner" may cause problem when processing dataset mag, better use "left", and check whether how many None in the title and abstract attribute.
-        if return_val:
-            return self.node_titles
+        if self._args.dataset == 'ogbn-arxiv':
+            node_idx_file = MAPPING_FILES[self._args.dataset]
+            node_idx = pd.read_csv(
+                node_idx_file,
+                sep=',', compression='gzip',
+                header=0,
+                names=['node_idx', 'paper_id']
+            )
+            node_idx['paper_id'] = node_idx['paper_id'].astype(np.int64)
+            idx_title = pd.read_csv(
+                os.path.join(data_dir,'titleabs.tsv.gz'),
+                sep='\t',
+                compression='gzip',
+                header=0,
+                names=['title', 'abstract'],
+                dtype={'title': str, 'abstract': str}
+            )
+            self.node_titles = node_idx.merge(idx_title.reset_index(), left_on='paper_id', right_on='index', how='inner')
+            #Here "inner" may cause problem when processing dataset mag, better use "left", and check whether how many None in the title and abstract attribute.
+            if return_val:
+                return self.node_titles
+        elif self._args.dataset == 'ogbn-mag':
+            #load file
+            idx_path = os.path.join(data_dir, 'mag-nodeidx2titles.csv')
+            df = pd.read_csv(
+                idx_path,
+                sep=',',
+                header= 0
+            )
 
+            #get node_idx and OriginalTitle
+            self.node_titles = df[['node_idx', 'paper_id', 'OriginalTitle']]
+            self.node_titles.rename(columns={'OriginalTitle': 'title'}, inplace=True)
+
+            self.node_titles['node_idx'] = self.node_titles['node_idx'].astype(np.int64)
+
+            if return_val:
+                return self.node_titles
+        else:
+            raise ValueError(f"Dataset {self._args.dataset} not supported.")
 
     def generate_e5_embeddings(self, return_val = True):
         # Load the E5 model and tokenizer
-        self.node_titles['text'] = self.node_titles['title'] + ' ' + self.node_titles['abstract'].fillna('')
+        #ogbn doesnt have abstract column so I will just work with titles
+        #self.node_titles['text'] = self.node_titles['title'] + ' ' + self.node_titles['abstract'].fillna('')
+
+        self.node_titles['text'] = self.node_titles['title']
         input_texts = self.node_titles['text'].to_list()
         model_name = MODEL_NAME["e5"]
         model = SentenceTransformer(model_name, device = device)
@@ -129,8 +151,20 @@ class GraphAlign_e5(ModelTrainer):
         embeddings = []
         for i in tqdm(range(0, len(input_texts), batch_size), desc="Encoding Progress"):
             batch = input_texts[i:i + batch_size]
-            batch_embeddings = model.encode(batch, normalize_embeddings=True)
-            embeddings.extend(batch_embeddings)
+            try:
+                batch_embeddings = model.encode(batch, normalize_embeddings=True)
+                embeddings.extend(batch_embeddings)
+            except Exception as e:
+                print(f"Error in batch {e}: Retrying with individual texts")
+                # loop individually to get embeddings within batch
+                for text in batch:
+                    try:
+                        single_embeddings = model.encode([text], normalize_embeddings=True)[0]
+                        embeddings.append(single_embeddings)
+                    except Exception as retry_err:
+                        # if error in processing embeddings within batch, put in a placeholder
+                        placeholder_embedding = np.zeros(MODEL_DIMS["e5"])
+                        embeddings.append(single_embeddings)
         self.node_feat_e5 = torch.tensor(embeddings, dtype=torch.float32).to(device)
         if return_val:
             return self.node_feat_e5.cpu().numpy()
@@ -140,10 +174,12 @@ class GraphAlign_e5(ModelTrainer):
         self.get_nodeidx_mappings(return_val=False)
         self.generate_e5_embeddings(return_val=False)
         self.graph = self.graph.to(self._args.device)
-        self.graph.ndata['e5_feat'] = self.node_feat_e5
+        if self._args.dataset == 'ogbn-arxiv':
+            self.graph.ndata['e5_feat'] = self.node_feat_e5
+        elif self._args.dataset == 'ogbn-mag':
+            self.graph.nodes['paper'].data['e5_feat'] = self.node_feat_e5
         #Here "e5_feat" is the normal embedding, and later generated graphalign embedding is saved to self.graph.ndata['ga_embedding']
         #We can load the datasetName_graph.bin to get the normal embedding.
-
 
     def infer_graphalign(self, return_val = True):
         self.model.eval()
@@ -152,14 +188,22 @@ class GraphAlign_e5(ModelTrainer):
         with torch.no_grad():
             #init features
             all_embeddings = []
-            x = self.graph.ndata['e5_feat'].clone().to(self._device)
+
+            # prepare data
+            if self._args.dataset == 'ogbn-arxiv':
+                x = self.graph.ndata['e5_feat'].clone().to(self._device)
+                g = self.graph
+            elif self._args.dataset == 'ogbn-mag':
+                x = self.graph.nodes['paper'].data['e5_feat'].clone().to(self._device)
+                paper_edges = ('paper', 'cites', 'paper')
+                g = self.graph.edge_type_subgraph([paper_edges])
 
             # Process in batches
             for start_idx in tqdm(range(0, num_nodes, batch_size), desc="Processing batches"):
                 end_idx = min(start_idx + batch_size, num_nodes)
                 batch_nodes = torch.arange(start_idx, end_idx).to(self._device)
-                batch_emb = self.model.embed(self.graph, x)[batch_nodes]
-                all_embeddings.append(batch_emb.cpu())
+                batch_emb = self.model.embed(g, x)[batch_nodes]
+                all_embeddings.extend(batch_emb.cpu())
             torch_embedding = torch.cat(all_embeddings, dim=0).to(self._device)
 
         # add embedding to graph
@@ -181,3 +225,43 @@ def open_pickle(file_path):
         data = pickle.load(f)
     return data
 
+def process_papers(path):
+    # load Paper.txt
+    paper_path = os.path.join(data_dir, 'Papers.txt')
+    column_names = ['paper_id', 'Rank', 'Doi', 'DocType', 'PaperTitle', 'OriginalTitle',
+                        'BookTitle','Year', 'Date', 'OnlineDate', 'Publisher', 'JournalId',
+                        'ConferenceSeriesId','ConferenceInstanceId', 'Volume', 'Issue',
+                        'FirstPage', 'LastPage','ReferenceCount', 'CitationCount',
+                        'EstimatedCitation', 'OriginalVenue','FamilyId', 'FamilyRank', 'DocSubTypes', 'CreatedDate'
+    ]
+    df = pd.read_csv(
+        paper_path,
+        sep='\t',
+        header=None,
+        names=column_names,
+        on_bad_lines='skip',
+        quoting=3
+    )
+
+    # load paper_entidx2name.csv.gz
+    node_idx = pd.read_csv(
+        os.path.join(data_dir, 'paper_entidx2name.csv.gz'),
+        sep=',',
+        compression='gzip',
+        header=0,
+        names=['node_idx', 'paper_id']
+    )
+    node_idx['paper_id'] = node_idx['paper_id'].astype(np.int64)
+
+    # left join
+    node_titles = node_idx.merge(df.reset_index(), left_on='paper_id', right_on='paper_id', how='left')
+
+    #filter columns
+    node_titles['OriginalTitle'] = node_titles['OriginalTitle'].fillna('')
+    node_titles['Year'] = node_titles['Year'].fillna(0)
+    node_titles['Year'] = node_titles['Year'].astype(int)
+
+    # save
+    node_titles.to_csv(os.path.join(data_dir, 'mag-nodeidx2titles.csv'), index=False)
+
+    return node_titles
