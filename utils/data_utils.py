@@ -115,6 +115,7 @@ class GraphAlign_e5(ModelTrainer):
                 dtype={'title': str, 'abstract': str}
             )
             self.node_titles = node_idx.merge(idx_title.reset_index(), left_on='paper_id', right_on='index', how='inner')
+            self.paperid = torch.tensor(node_idx['paper_id'], dtype=torch.int64).to(device)
             #Here "inner" may cause problem when processing dataset mag, better use "left", and check whether how many None in the title and abstract attribute.
             if return_val:
                 return self.node_titles
@@ -130,7 +131,7 @@ class GraphAlign_e5(ModelTrainer):
             #get node_idx and OriginalTitle
             self.node_titles = df[['node_idx', 'paper_id', 'OriginalTitle']]
             self.node_titles.rename(columns={'OriginalTitle': 'title'}, inplace=True)
-
+            self.paperid = torch.tensor(df['paper_id'],dtype=torch.int64).to(device)
             self.node_titles['node_idx'] = self.node_titles['node_idx'].astype(np.int64)
 
             if return_val:
@@ -148,7 +149,7 @@ class GraphAlign_e5(ModelTrainer):
         input_texts = self.node_titles['text'].to_list()
         model_name = MODEL_NAME["e5"]
         model = SentenceTransformer(model_name, device = device)
-        batch_size = 64
+        batch_size = self._args.batch_size_f
         embeddings = []
         for i in tqdm(range(0, len(input_texts), batch_size), desc="Encoding Progress"):
             batch = input_texts[i:i + batch_size]
@@ -176,11 +177,13 @@ class GraphAlign_e5(ModelTrainer):
         self.graph = self.graph.to(self._args.device)
         if self._args.dataset == 'ogbn-arxiv':
             self.graph.ndata['e5_feat'] = self.node_feat_e5
+            self.graph.ndata['paper_id'] = self.paperid
         elif self._args.dataset == 'ogbn-mag':
             self.graph.nodes['paper'].data['e5_feat'] = self.node_feat_e5
+            self.graph.nodes['paper'].data['paper_id'] = self.paperid
 
         if return_val:
-            return self.node_feat_e5
+            return self.node_feat_e5.cpu().numpy()
         #Here "e5_feat" is the normal embedding, and later generated graphalign embedding is saved to self.graph.ndata['ga_embedding']
         #We can load the datasetName_graph.bin to get the normal embedding.
 

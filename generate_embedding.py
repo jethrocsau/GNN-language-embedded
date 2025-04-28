@@ -1,9 +1,13 @@
 import os
+import pickle
 from argparse import Namespace
 
+import numpy as np
+import pandas as pd
 import torch
-from dgl.dataloading import GraphDataLoader
 from dgl.data.utils import save_graphs
+from dgl.dataloading import GraphDataLoader
+
 import utils.data_utils as du
 from utils.data_utils import GraphAlign_e5, load_ogb_dataset, open_pickle
 
@@ -25,7 +29,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # datset names
 dataset_names = ['ogbn-mag','ogbn-arxiv']
-idx_dataset = 0
+idx_dataset = input("Select dataset (0: ogbn-mag, 1: ogbn-arxiv): ")
+idx_dataset = int(idx_dataset)  # Convert to integer
+if idx_dataset < 0 or idx_dataset >= len(dataset_names):
+    raise ValueError("Invalid dataset index. Please choose 0 or 1.")
 
 # set arguments
 args = Namespace(
@@ -102,7 +109,7 @@ if dataset_names[idx_dataset]== 'ogbn-arxiv':
 elif dataset_names[idx_dataset]== 'ogbn-mag':
     save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label['paper']})
 
-# save graphalign embeddings pt
+# save graphalign embeddings pt1
 torch.save(
     e5_embedding,
     os.path.join(processed_dir, f'{dataset_name}_e5_embeddings.pt'),
@@ -114,3 +121,27 @@ torch.save(
     os.path.join(processed_dir, f'{dataset_name}_graphalign_embeddings.pt'),
     pickle_protocol=4  # Specify protocol 4
 )
+
+# save the paper-id to embedding
+if dataset_names[idx_dataset] == 'ogbn-arxiv':
+    paper_id = model.graph.ndata['paper_id']
+    paper_id = paper_id.cpu().numpy()
+    mappings = {
+        'paper_id': paper_id,
+        'e5_embedding': e5_embedding.cpu().numpy(),
+        'ga_embedding': ga_embeddings
+    }
+elif dataset_names[idx_dataset] == 'ogbn-mag':
+    paper_id = model.graph.nodes['paper'].data['paper_id']
+    paper_id = paper_id.cpu().numpy()
+    mappings = {
+            'paper_id': paper_id,
+            'e5_embedding': e5_embedding.cpu().numpy(),
+            'ga_embedding': ga_embeddings
+    }
+
+
+# save pickle
+with open(os.path.join(processed_dir, f'{dataset_name}_mappings.pkl'), 'wb') as f:
+    pickle.dump(mappings, f, protocol=pickle.HIGHEST_PROTOCOL)
+

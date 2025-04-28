@@ -5,3 +5,4 @@ fastmoe/
 .DS_Store
 /data/stark-mag
 /data
+processed/ogbn-arxiv_graphalign_embeddings.pt
