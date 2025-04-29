@@ -25,6 +25,7 @@ else:
 
 # device torch
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+th.manual_seed(42)
 
 # set foldrs
 data_dir = os.path.join(cwd, 'data')

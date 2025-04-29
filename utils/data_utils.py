@@ -172,7 +172,7 @@ class GraphAlign_e5(ModelTrainer):
         #ogbn doesnt have abstract column so I will just work with titles
         #self.node_titles['text'] = self.node_titles['title'] + ' ' + self.node_titles['abstract'].fillna('')
 
-        self.node_titles['text'] = self.node_titles['title']
+        self.node_titles['text'] = "query: " + self.node_titles['title']
         input_texts = self.node_titles['text'].to_list()
         model_name = MODEL_NAME["e5"]
         model = SentenceTransformer(model_name, device = device)

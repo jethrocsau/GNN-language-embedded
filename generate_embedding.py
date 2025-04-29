@@ -139,7 +139,7 @@ elif dataset_names[idx_dataset] == 'ogbn-mag':
     paper_id = paper_id.cpu().numpy()
     mappings = {
             'paper_id': paper_id,
-            'e5_embedding': e5_embedding.numpy(),
+            'e5_embedding': e5_embedding,
             'ga_embedding': ga_embeddings
     }
 elif dataset_names[idx_dataset] == 'combined':
@@ -147,7 +147,7 @@ elif dataset_names[idx_dataset] == 'combined':
     paper_id = paper_id.cpu().numpy()
     mappings = {
         'paper_id': paper_id,
-        'e5_embedding': e5_embedding.numpy(),
+        'e5_embedding': e5_embedding,
         'ga_embedding': ga_embeddings
     }
 
