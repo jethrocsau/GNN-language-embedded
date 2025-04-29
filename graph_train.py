@@ -138,7 +138,24 @@ gat_original_accuracy, gat_original_f1 = evaluate(
 )
 
 # print results
-print(f"GAT E5 Accuracy: {gat_e5_accuracy:.4f}, F1: {gat_e5_f1:.4f}")
-print(f"GAT GA Accuracy: {gat_ga_accuracy:.4f}, F1: {gat_ga_f1:.4f}")
-print(f"GAT Original Accuracy: {gat_original_accuracy:.4f}, F1: {gat_original_f1:.4f}")
+print(f"GAT E5 Test Accuracy: {gat_e5_accuracy:.4f}, F1: {gat_e5_f1:.4f}")
+print(f"GAT GA Test Accuracy: {gat_ga_accuracy:.4f}, F1: {gat_ga_f1:.4f}")
+print(f"GAT Original Test Accuracy: {gat_original_accuracy:.4f}, F1: {gat_original_f1:.4f}")
+
+# save results
+results = {
+   'gat_e5_accuracy': gat_e5_accuracy,
+   'gat_e5_f1': gat_e5_f1,
+   'gat_ga_accuracy': gat_ga_accuracy,
+   'gat_ga_f1': gat_ga_f1,
+   'gat_original_accuracy': gat_original_accuracy,
+   'gat_original_f1': gat_original_f1,
+}
+with open(os.path.join(processed_dir, 'gat_results.pkl'), 'wb') as f:
+   pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+# save model
+th.save(gat_e5.state_dict(), os.path.join(processed_dir, 'gat_e5_model.pth'))
+th.save(gat_ga.state_dict(), os.path.join(processed_dir, 'gat_ga_model.pth'))
+th.save(gat_original.state_dict(), os.path.join(processed_dir, 'gat_original_model.pth'))
 
