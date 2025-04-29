@@ -22,4 +22,4 @@ sampled mag | 20 epoches | graphsage | accuracy : 31%
 <img width="442" alt="image" src="https://github.com/user-attachments/assets/82e65470-45da-4cf4-9b42-0e92e8c05b37" />
 
 
-combined | 
+combined | 200 epoches | graphsage | accuracy: 42.48%
