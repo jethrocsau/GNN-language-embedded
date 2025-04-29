@@ -51,7 +51,7 @@ e5_mapping = []
 ga_mapping = []
 for i in range(graph.num_nodes()):
     if arxiv_mask[i]:
-        node_id = graph_id[i]
+        node_id = graph_id[i] 
         e5_mapping.append(arxiv_e5_embedding[node_id])
         ga_mapping.append(arxiv_ga_embedding[node_id])
     else:
@@ -62,9 +62,9 @@ for i in range(graph.num_nodes()):
 
 # assign e5 & ga embedding for each node in the graph
 for i in range(graph.num_nodes()):
-    paper_id = graph.ndata['_ID'].numpy()[i]
-    graph.ndata['e5'][i] = th.tensor(e5_mapping[paper_id])
-    graph.ndata['graphalign'][i] = th.tensor(ga_mapping[paper_id])
+    paper_id = graph.ndata['_ID'].numpy()[i] #the name here changed to node_id is better
+    graph.ndata['e5'][i] = th.tensor(e5_mapping[paper_id]) #same change
+    graph.ndata['graphalign'][i] = th.tensor(ga_mapping[paper_id]) #same change
 
 # save graph with e5 & ga embeddings
 dgl_save_path = os.path.join(processed_path, 'combined_graph_with_embeddings.bin')
