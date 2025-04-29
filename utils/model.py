@@ -1,0 +1,160 @@
+
+import torch.nn.functional as F
+import torch.nn as nn
+import torch as th
+from sklearn.metrics import accuracy_score, f1_score
+import dgl
+from dgl.nn import GATConv
+from dgl.dataloading import DataLoader, MultiLayerFullNeighborSampler
+import numpy as np
+
+# device torch
+device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+th.manual_seed(42)
+
+class GAT(nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim, num_heads):
+        super(GAT, self).__init__()
+        self.layer1 = GATConv(in_dim, hidden_dim, num_heads=num_heads)
+        self.layer2 = GATConv(hidden_dim * num_heads, out_dim, num_heads=1)
+
+    def forward(self, graph, h):
+        # Handle both full graph and block-based inputs
+        if isinstance(graph, list):  # If we're using blocks
+            h = self.layer1(graph[0], h)
+            h = h.view(h.shape[0], -1)
+            h = F.relu(h)
+            h = F.dropout(h, p=0.2, training=self.training)
+
+            # layer2
+            h = self.layer2(graph[1], h)
+            h = h.squeeze(1)
+        else:
+            h = self.layer1(graph, h)
+            h = h.view(h.shape[0], -1)
+            h = F.relu(h)
+            h = F.dropout(h, p=0.2, training=self.training)
+            h = self.layer2(graph, h)
+            h = h.squeeze(1)
+        return h
+
+class MLP(nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim):
+        super(MLP, self).__init__()
+        self.fc1 = nn.Linear(in_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, out_dim)
+
+    def forward(self, h):
+        h = F.dropout(h, p=0.2, training=self.training)
+        h = F.relu(self.fc1(h))
+        h = F.dropout(h, p=0.2, training=self.training)
+        h = F.relu(self.fc2(h))
+        h = self.fc3(h)
+        return h
+
+# Function to evaluate model
+def evaluate(model, graph, features, labels, mask, is_mlp=False):
+    model.eval()
+    with th.no_grad():
+        if is_mlp:
+            logits = model(features)
+        else:
+            logits = model(graph, features)
+        logits = logits[mask]
+        labels = labels[mask]
+        _, indices = th.max(logits, dim=1)
+
+        # convert
+        indices = indices.cpu().numpy()
+        labels = labels.cpu().numpy()
+        labels = np.argmax(labels,axis=1)
+
+        accuracy = accuracy_score(labels, indices)
+        f1 = f1_score(labels, indices, average='macro')
+    return accuracy, f1
+
+# Function to train model
+def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, lr=0.005, is_mlp=False, batch_size=2056):
+    optimizer = th.optim.Adam(model.parameters(), lr=lr, weight_decay=5e-4)
+    best_val_acc = 0
+    best_model_state = None
+
+    # Convert indices to tensors if they're not already
+    if isinstance(train_idx, np.ndarray):
+        train_idx = th.from_numpy(train_idx)
+    if isinstance(val_idx, np.ndarray):
+        val_idx = th.from_numpy(val_idx)
+
+    # Move model and data to device
+    model = model.to(device)
+    graph = graph.to(device)
+    features = features.to(device)
+    labels = labels.to(device)
+    train_idx = train_idx.to(device)
+    val_idx = val_idx.to(device)
+
+    # Set up data loader
+    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
+    train_loader = DataLoader(
+        graph, train_idx, sampler,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=0
+    )
+
+    val_loader = DataLoader(
+        graph, val_idx, sampler,
+        batch_size=batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=0
+    )
+
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0
+        batch_count = 0
+
+        # Training with batches - only on train_idx
+        for input_nodes, output_nodes, blocks in train_loader:
+            batch_count += 1
+
+            # Get the features and labels for this batch
+            batch_inputs = features[input_nodes]
+            batch_labels = labels[output_nodes].float()
+            batch_inputs = batch_inputs.to(device)
+            batch_labels = batch_labels.to(device)
+            blocks = [block.to(device) for block in blocks]
+            input_nodes = input_nodes.to(device)
+            output_nodes = output_nodes.to(device)
+
+            # Forward pass - different handling for MLP and graph models
+            if is_mlp:
+                # For MLP, we only need features of output nodes
+                batch_pred = model(features[output_nodes])
+            else:
+                # For graph models, we use the subgraph (blocks)
+                batch_pred = model(blocks, batch_inputs)
+
+            # Compute loss
+            loss = F.cross_entropy(batch_pred, batch_labels)
+
+            # Backward and optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+
+        # After each epoch, evaluate the model on the validation set - only on val_idx
+        model.eval()
+        val_acc, val_f1 = evaluate(model, graph, features, labels, val_idx, is_mlp=is_mlp)
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/batch_count:.4f}, Val Acc: {val_acc:.4f}, Val F1: {val_f1:.4f}")
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            best_model_state = model.state_dict()
+            print(f"Best model updated at epoch {epoch+1} with val acc: {best_val_acc:.4f}")
+
+    return best_model_state, best_val_acc

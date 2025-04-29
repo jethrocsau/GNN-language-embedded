@@ -28,8 +28,8 @@ data_dir = os.path.join(cwd, 'data')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # datset names
-dataset_names = ['ogbn-mag','ogbn-arxiv']
-idx_dataset = input("Select dataset (0: ogbn-mag, 1: ogbn-arxiv): ")
+dataset_names = ['ogbn-mag','ogbn-arxiv','combined']
+idx_dataset = input("Select dataset (0: ogbn-mag, 1: ogbn-arxiv, 2: combined): ")
 idx_dataset = int(idx_dataset)  # Convert to integer
 if idx_dataset < 0 or idx_dataset >= len(dataset_names):
     raise ValueError("Invalid dataset index. Please choose 0 or 1.")
@@ -108,6 +108,8 @@ if dataset_names[idx_dataset]== 'ogbn-arxiv':
     save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label})
 elif dataset_names[idx_dataset]== 'ogbn-mag':
     save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label['paper']})
+elif dataset_names[idx_dataset]== 'combined':
+    save_graphs(os.path.join(cwd, 'processed', f'{dataset_name}_graph.bin'), model.graph, labels = {'glabel':model.label})
 
 # save graphalign embeddings pt1
 torch.save(
@@ -122,13 +124,14 @@ torch.save(
     pickle_protocol=4  # Specify protocol 4
 )
 
+
 # save the paper-id to embedding
 if dataset_names[idx_dataset] == 'ogbn-arxiv':
     paper_id = model.graph.ndata['paper_id']
     paper_id = paper_id.cpu().numpy()
     mappings = {
         'paper_id': paper_id,
-        'e5_embedding': e5_embedding.cpu().numpy(),
+        'e5_embedding': e5_embedding.numpy(),
         'ga_embedding': ga_embeddings
     }
 elif dataset_names[idx_dataset] == 'ogbn-mag':
@@ -136,10 +139,17 @@ elif dataset_names[idx_dataset] == 'ogbn-mag':
     paper_id = paper_id.cpu().numpy()
     mappings = {
             'paper_id': paper_id,
-            'e5_embedding': e5_embedding.cpu().numpy(),
+            'e5_embedding': e5_embedding.numpy(),
             'ga_embedding': ga_embeddings
     }
-
+elif dataset_names[idx_dataset] == 'combined':
+    paper_id = model.graph.ndata['paper_id']
+    paper_id = paper_id.cpu().numpy()
+    mappings = {
+        'paper_id': paper_id,
+        'e5_embedding': e5_embedding.numpy(),
+        'ga_embedding': ga_embeddings
+    }
 
 # save pickle
 with open(os.path.join(processed_dir, f'{dataset_name}_mappings.pkl'), 'wb') as f:

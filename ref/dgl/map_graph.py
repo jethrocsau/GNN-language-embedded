@@ -41,7 +41,7 @@ with gzip.open(graph_path, 'rb') as f:
     graph = pickle.load(f)
 
 # get '_ID','graph_source'
-graph_id = graph.ndata['_ID'].numpy()
+paper_id = graph.ndata['paper_id']
 graph_source = graph.ndata['graph_source'].numpy()
 arxiv_mask = graph_source == 0
 mag_mask = graph_source != 0

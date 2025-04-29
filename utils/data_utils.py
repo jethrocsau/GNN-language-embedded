@@ -5,7 +5,8 @@ import threading
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+import pickle
+import gzip
 import numpy as np
 import pandas as pd
 import torch
@@ -21,7 +22,7 @@ from src.trainer_large import ModelTrainer, build_model
 from src.utils.utils import set_random_seed
 
 # Global variables
-dataset_names = ['ogbn-mag','ogbn-arxiv','ogbn-products']
+dataset_names = ['ogbn-mag','ogbn-arxiv','ogbn-products','combined']
 utils_path = os.path.dirname(os.path.abspath(__file__))
 cwd = os.path.dirname(utils_path)
 model_dir = os.path.join(cwd, 'model')
@@ -68,7 +69,6 @@ def load_ogb_dataset(name):
         train_idx, valid_idx, test_idx = split_idx["train"], split_idx["valid"], split_idx["test"]
         return dataset, train_idx, valid_idx, test_idx
 
-
 '''
 Adapted from GraphAlign Github repository
 '''
@@ -78,10 +78,21 @@ class GraphAlign_e5(ModelTrainer):
         super().__init__(args)
         self._args = args
         self.pretrain_seed = 42
-        self.dataset, self.train_idx, self.valid_idx, self.test_idx = load_ogb_dataset(args.dataset)
-        self.graph, self.label = self.dataset[0]
-        self.feat_type = getattr(args, 'feat_type', None)
-        self.prepare_dataset()
+        if self._args.dataset == 'combined':
+            graph_path = os.path.join(data_dir,'combined_graph_paper_id.pkl.gz')
+            with gzip.open(graph_path, 'rb') as f:
+                graph = pickle.load(f)
+                self.graph = graph.to(args.device)
+                self.label = graph.ndata['label']
+                self.train_idx = np.where(graph.ndata['train_mask'] == 1)[0]
+                self.val_idx = np.where(graph.ndata['valid_mask'] == 1)[0]
+                self.test_idx = np.where(graph.ndata['test_mask'] == 1)[0]
+                self.feat_type = getattr(args, 'feat_type', None)
+        else:
+            self.dataset, self.train_idx, self.valid_idx, self.test_idx = load_ogb_dataset(args.dataset)
+            self.graph, self.label = self.dataset[0]
+            self.feat_type = getattr(args, 'feat_type', None)
+            self.prepare_dataset()
 
     def load_model(self):
             set_random_seed(self.pretrain_seed)
@@ -136,12 +147,28 @@ class GraphAlign_e5(ModelTrainer):
 
             if return_val:
                 return self.node_titles
+        elif self._args.dataset == 'combined':
+            #load file
+            idx_path = os.path.join(data_dir, 'combined-nodeidx2titles.csv')
+            df = pd.read_csv(
+                idx_path,
+                sep=',',
+                header= 0
+            )
+            self.node_titles = df[['paper_id', 'OriginalTitle']]
+            self.node_titles.rename(columns={'OriginalTitle': 'title'}, inplace=True)
+            self.paperid = torch.tensor(self.graph.ndata['paper_id'],dtype=torch.int64).to(device)
+
+            if return_val:
+                return self.node_titles
+
         else:
             raise ValueError(f"Dataset {self._args.dataset} not supported.")
 
     def generate_e5_embeddings(self, return_val = True):
         print("Generating E5 embeddings...")
         # Load the E5 model and tokenizer
+
         #ogbn doesnt have abstract column so I will just work with titles
         #self.node_titles['text'] = self.node_titles['title'] + ' ' + self.node_titles['abstract'].fillna('')
 
@@ -165,7 +192,7 @@ class GraphAlign_e5(ModelTrainer):
                     except Exception as retry_err:
                         # if error in processing embeddings within batch, put in a placeholder
                         placeholder_embedding = np.zeros(MODEL_DIMS["e5"])
-                        embeddings.append(single_embeddings)
+                        embeddings.append(placeholder_embedding)
         self.node_feat_e5 = torch.tensor(embeddings, dtype=torch.float32).to(device)
         if return_val:
             return self.node_feat_e5.cpu().numpy()
@@ -181,6 +208,9 @@ class GraphAlign_e5(ModelTrainer):
         elif self._args.dataset == 'ogbn-mag':
             self.graph.nodes['paper'].data['e5_feat'] = self.node_feat_e5
             self.graph.nodes['paper'].data['paper_id'] = self.paperid
+        elif self._args.dataset == 'combined':
+            self.graph.ndata['e5_feat'] = self.node_feat_e5
+            self.graph.ndata['paper_id'] = self.paperid
 
         if return_val:
             return self.node_feat_e5.cpu().numpy()
@@ -205,6 +235,10 @@ class GraphAlign_e5(ModelTrainer):
                 paper_edges = ('paper', 'cites', 'paper')
                 num_nodes = len(x)
                 g = self.graph.edge_type_subgraph([paper_edges])
+            elif self._args.dataset == 'combined':
+                x = self.graph.ndata['e5_feat'].clone().to(self._device)
+                num_nodes = len(x)
+                g = self.graph
 
             # Process in batches
             for start_idx in tqdm(range(0, num_nodes, batch_size), desc="Processing batches"):
@@ -216,11 +250,10 @@ class GraphAlign_e5(ModelTrainer):
 
         # add embedding to graph
         self.graph = self.graph.to(self._args.device)
-        if self._args.dataset == 'ogbn-arxiv':
+        if self._args.dataset == 'ogbn-arxiv' or 'combined':
             self.graph.ndata['ga_embedding'] = torch_embedding
         elif self._args.dataset == 'ogbn-mag':
             self.graph.nodes['paper'].data['ga_embedding'] = torch_embedding
-
         if return_val:
             return torch_embedding.cpu().numpy()
 
@@ -237,7 +270,7 @@ def open_pickle(file_path):
         data = pickle.load(f)
     return data
 
-def process_papers(path):
+def process_papers(dataset_name):
     # load Paper.txt
     paper_path = os.path.join(data_dir, 'Papers.txt')
     column_names = ['paper_id', 'Rank', 'Doi', 'DocType', 'PaperTitle', 'OriginalTitle',
@@ -255,28 +288,47 @@ def process_papers(path):
         quoting=3
     )
 
-    # load paper_entidx2name.csv.gz
-    node_idx = pd.read_csv(
-        os.path.join(data_dir, 'paper_entidx2name.csv.gz'),
-        sep=',',
-        compression='gzip',
-        header=0,
-        names=['node_idx', 'paper_id']
-    )
-    node_idx['paper_id'] = node_idx['paper_id'].astype(np.int64)
+    if dataset_name == 'ogbn-mag':
+        # load paper_entidx2name.csv.gz
+        node_idx = pd.read_csv(
+            os.path.join(data_dir, 'paper_entidx2name.csv.gz'),
+            sep=',',
+            compression='gzip',
+            header=0,
+            names=['node_idx', 'paper_id']
+        )
+        node_idx['paper_id'] = node_idx['paper_id'].astype(np.int64)
 
-    # left join
-    node_titles = node_idx.merge(df.reset_index(), left_on='paper_id', right_on='paper_id', how='left')
+        # left join
+        node_titles = node_idx.merge(df.reset_index(), left_on='paper_id', right_on='paper_id', how='left')
 
-    #filter columns
-    node_titles['OriginalTitle'] = node_titles['OriginalTitle'].fillna('')
-    node_titles['Year'] = node_titles['Year'].fillna(0)
-    node_titles['Year'] = node_titles['Year'].astype(int)
+        #filter columns
+        node_titles['OriginalTitle'] = node_titles['OriginalTitle'].fillna('')
+        node_titles['Year'] = node_titles['Year'].fillna(0)
+        node_titles['Year'] = node_titles['Year'].astype(int)
 
-    # save
-    node_titles.to_csv(os.path.join(data_dir, 'mag-nodeidx2titles.csv'), index=False)
+        # save
+        node_titles.to_csv(os.path.join(data_dir, 'mag-nodeidx2titles.csv'), index=False)
+        return node_titles
+    elif dataset_name == 'combined':
+        graph_path = os.path.join(data_dir,'combined_graph_paper_id.pkl.gz')
+        with gzip.open(graph_path, 'rb') as f:
+            graph = pickle.load(f)
+        paper_id = pd.DataFrame(graph.ndata['paper_id'].cpu().numpy(), columns=['paper_id'])
+        paper_id['paper_id'] = paper_id['paper_id'].astype(np.int64)
 
-    return node_titles
+        # left join
+        node_titles = paper_id.merge(df.reset_index(), left_on='paper_id', right_on='paper_id', how='left')
+
+         #filter columns
+        node_titles['OriginalTitle'] = node_titles['OriginalTitle'].fillna('')
+        node_titles['Year'] = node_titles['Year'].fillna(0)
+        node_titles['Year'] = node_titles['Year'].astype(int)
+
+        # save
+        node_titles.to_csv(os.path.join(data_dir, 'combined-nodeidx2titles.csv'), index=False)
+        return node_titles
+
 
 def pulse_check():
         print("Process is still running...")
