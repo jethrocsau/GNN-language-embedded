@@ -12,7 +12,7 @@ from sklearn.metrics import accuracy_score, f1_score
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 th.manual_seed(42)
 
-to_sample = False
+to_sample = True
 
 class GAT(nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, num_heads):
@@ -140,11 +140,23 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
                 else:
                     # For graph models, we use the subgraph (blocks)
                     batch_pred = model(blocks, batch_inputs)
+
+                # Compute loss
+                loss = F.cross_entropy(batch_pred, batch_labels)
+
+                # Backward and optimize
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                total_loss += loss.item()
+
         else:
             for batch_graph, batch_nodes in batchify(graph, train_idx, batch_size):
+                batch_count += 1
 
                 # Get the features and labels for this batch
-                batch_inputs = features[input_nodes]
+                batch_inputs = features[batch_nodes]
                 batch_labels = labels[batch_nodes].float()
                 batch_inputs = batch_inputs.to(device)
                 batch_labels = batch_labels.to(device)
@@ -152,20 +164,20 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
                 # Forward pass - different handling for MLP and graph models
                 if is_mlp:
                     # For MLP, we only need features of output nodes
-                    batch_pred = model(features[output_nodes])
+                    batch_pred = model(batch_inputs)
                 else:
                     # For graph models, we use the subgraph (blocks)
                     batch_pred = model(batch_graph, batch_inputs)
 
-        # Compute loss
-        loss = F.cross_entropy(batch_pred, batch_labels)
+                # Compute loss
+                loss = F.cross_entropy(batch_pred, batch_labels)
 
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+                # Backward and optimize
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-        total_loss += loss.item()
+                total_loss += loss.item()
 
         # After each epoch, evaluate the model on the validation set - only on val_idx
         model.eval()
@@ -178,7 +190,11 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
 
     return best_model_state, best_val_acc
 
-def batchify(graph, features, train_idx, batch_size):
+def batchify(graph, train_idx, batch_size):
+    #if not on device
+    graph = graph.to(device)
+    train_idx = train_idx.to(device)
+
     for i in range(0,len(train_idx),batch_size):
         batch_nodes = train_idx[i:i+batch_size]
         subgraph = dgl.node_subgraph(graph, batch_nodes)
