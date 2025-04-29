@@ -11,7 +11,7 @@ baseline of original embedding in paper obg:
 <img width="418" alt="image" src="https://github.com/user-attachments/assets/7f4ddee9-1fc7-4052-ad7c-e54f0ded301f" />
 <img width="385" alt="image" src="https://github.com/user-attachments/assets/4f12edb2-fecb-473e-a800-4174ebb20b9b" />
 
-dyf result of no embedding:
+dyf result of original embedding:
 
 
 arxiv | 100 epoches | graphsage | accuracy : 68% | 
