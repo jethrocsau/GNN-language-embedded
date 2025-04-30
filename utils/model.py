@@ -18,7 +18,8 @@ class GAT(nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, num_heads):
         super(GAT, self).__init__()
         self.layer1 = GATConv(in_dim, hidden_dim, num_heads=num_heads)
-        self.layer2 = GATConv(hidden_dim * num_heads, out_dim, num_heads=1)
+        self.layer2 = GATConv(hidden_dim * num_heads, hidden_dim, num_heads=num_heads)
+        self.layer3 = GATConv(hidden_dim, out_dim, num_heads=1)
 
     def forward(self, graph, h):
         # Handle both full graph and block-based inputs
@@ -26,20 +27,37 @@ class GAT(nn.Module):
             h = self.layer1(graph[0], h)
             h = h.view(h.shape[0], -1)
             h = F.relu(h)
-            h = F.dropout(h, p=0.2, training=self.training)
+            h = F.dropout(h, p=0.3, training=self.training)
 
             # layer2
             h = self.layer2(graph[1], h)
+            h = h.view(h.shape[0], -1)
+            h = F.relu(h)
+            h = F.dropout(h, p=0.3, training=self.training)
+
+            # layer3
+            h = self.layer3(graph[2], h)
+            h = h.view(h.shape[0], -1)
+            h = F.relu(h)
+            h = F.dropout(h, p=0.3, training=self.training)
             h = h.squeeze(1)
         else:
             h = self.layer1(graph, h)
             h = h.view(h.shape[0], -1)
             h = F.relu(h)
-            h = F.dropout(h, p=0.2, training=self.training)
+            h = F.dropout(h, p=0.3, training=self.training)
             h = self.layer2(graph, h)
+            h = h.view(h.shape[0], -1)
+            h = F.relu(h)
+            h = F.dropout(h, p=0.3, training=self.training)
+            h = self.layer3(graph, h)
+            h = h.view(h.shape[0], -1)
+            h = F.relu(h)
+            h = F.dropout(h, p=0.3, training=self.training)
             h = h.squeeze(1)
         return h
 
+### old implementation  ignore ###
 class MLP(nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim):
         super(MLP, self).__init__()
@@ -54,6 +72,7 @@ class MLP(nn.Module):
         h = F.relu(self.fc2(h))
         h = self.fc3(h)
         return h
+### old implementation  ignore ###
 
 # Function to evaluate model
 def evaluate(model, graph, features, labels, mask, is_mlp=False):
@@ -77,9 +96,10 @@ def evaluate(model, graph, features, labels, mask, is_mlp=False):
     return accuracy, f1
 
 # Function to train model
-def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, lr=0.005, is_mlp=False, batch_size=2056):
+def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, lr=0.005, is_mlp=False, batch_size=2056, to_sample=True):
     optimizer = th.optim.Adam(model.parameters(), lr=lr, weight_decay=5e-4)
     best_val_acc = 0
+    best_f1 = 0
     best_model_state = None
 
     # Convert indices to tensors if they're not already
@@ -97,7 +117,7 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
     val_idx = val_idx.to(device)
 
     # Set up data loader
-    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(2)
+    sampler = dgl.dataloading.MultiLayerFullNeighborSampler(3)
     train_loader = DataLoader(
         graph, train_idx, sampler,
         batch_size=batch_size,
@@ -119,7 +139,7 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
         total_loss = 0
         batch_count = 0
 
-        if to_sample:
+        if to_sample == False:
             # Training with batches - only on train_idx
             for input_nodes, output_nodes, blocks in train_loader:
                 batch_count += 1
@@ -186,9 +206,10 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             best_model_state = model.state_dict()
-            print(f"Best model updated at epoch {epoch+1} with val acc: {best_val_acc:.4f}")
+            best_f1 = val_f1
+            print(f"Best model updated at epoch {epoch+1} with val acc: {best_val_acc:.4f}, val f1: {best_f1:.4f}")
 
-    return best_model_state, best_val_acc
+    return best_model_state, best_val_acc, best_f1
 
 def batchify(graph, train_idx, batch_size):
     #if not on device

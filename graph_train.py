@@ -30,7 +30,7 @@ th.manual_seed(42)
 # set foldrs
 data_dir = os.path.join(cwd, 'data')
 processed_dir = os.path.join(cwd, 'processed')
-graph_path = os.path.join(processed_dir,'combined_graph.bin')
+graph_path = os.path.join(processed_dir,'combined_graph_pca.bin')
 
 # load graph
 graphs, _ = load_graphs(graph_path)
@@ -56,10 +56,10 @@ output_dim = labels.shape[1]
 # node2vec = 128
 # e5_features = 384
 # ga_features = 1024
-gat_heads = 8
-original_hidden_dim = 300
-e5_hidden_dim = 100
-ga_hidden_dim = 30
+gat_heads = 1
+original_hidden_dim = 512
+e5_hidden_dim = 512
+ga_hidden_dim = 512
 batch_size = 1024
 
 # create model
@@ -78,59 +78,65 @@ original_features = original_features.to(device)
 labels = labels.to(device)
 
 
-# train modelx
-gat_e5_state, gat_e5_best_val = train_model(
+# train model with normal sampling
+to_sample=False #batchify sampling
+#to_sample = True #multihop sampling
+
+gat_e5_state, gat_e5_best_val, gat_e5_best_f1 = train_model(
    gat_e5,
    graph,
    e5_features,
    labels,
    train_idx,
    val_idx,
-   epochs=200,
-   lr=0.005
+   epochs=100,
+   lr=0.005,
+   to_sample=to_sample
 )
 gat_e5.load_state_dict(gat_e5_state)
 
-gat_ga_state, gat_ga_best_val = train_model(
+gat_ga_state, gat_ga_best_val,gat_ga_best_f1 = train_model(
    gat_ga,
    graph,
    ga_features,
    labels,
    train_idx,
    val_idx,
-   epochs=200,
-   lr=0.005
+   epochs=100,
+   lr=0.005,
+   to_sample=to_sample
 )
 gat_ga.load_state_dict(gat_ga_state)
 
-gat_original_state, gat_original_best_val = train_model(
+gat_original_state, gat_original_best_val,gat_original_best_f1 = train_model(
    gat_original,
    graph,
    original_features,
    labels,
    train_idx,
    val_idx,
-   epochs=200,
-   lr=0.005
+   epochs=100,
+   lr=0.005,
+   to_sample=to_sample
 )
 gat_original.load_state_dict(gat_original_state)
 
 # evaluate
-gat_e5_accuracy, gat_e5_f1 = evaluate(
+gat_e5_test_accuracy, gat_e5_test_f1 = evaluate(
    gat_e5,
    graph,
    e5_features,
    labels,
    graph.ndata['test_mask']
 )
-gat_ga_accuracy, gat_ga_f1 = evaluate(
+gat_ga_test_accuracy, gat_ga_test_f1 = evaluate(
    gat_ga,
    graph,
    ga_features,
    labels,
    graph.ndata['test_mask']
 )
-gat_original_accuracy, gat_original_f1 = evaluate(
+gat_original_test_accuracy, gat_original_test_f1 = evaluate(
    gat_original,
    graph,
    original_features,
@@ -139,24 +145,40 @@ gat_original_accuracy, gat_original_f1 = evaluate(
 )
 
 # print results
-print(f"GAT E5 Test Accuracy: {gat_e5_accuracy:.4f}, F1: {gat_e5_f1:.4f}")
-print(f"GAT GA Test Accuracy: {gat_ga_accuracy:.4f}, F1: {gat_ga_f1:.4f}")
-print(f"GAT Original Test Accuracy: {gat_original_accuracy:.4f}, F1: {gat_original_f1:.4f}")
+print(f"GAT E5 Best Validation Accuracy: {gat_e5_best_val:.4f}, F1: {gat_e5_best_f1:.4f}")
+print(f"GAT E5 Test Accuracy: {gat_e5_test_accuracy:.4f}, F1: {gat_e5_test_f1:.4f}")
+print(f"GAT GA Best Validation Accuracy: {gat_ga_best_val:.4f}, F1: {gat_ga_best_f1:.4f}")
+print(f"GAT GA Test Accuracy: {gat_ga_test_accuracy:.4f}, F1: {gat_ga_test_f1:.4f}")
+print(f"GAT Original Best Validation Accuracy: {gat_original_best_val:.4f}, F1: {gat_original_best_f1:.4f}")
+print(f"GAT Original Test Accuracy: {gat_original_test_accuracy:.4f}, F1: {gat_original_test_f1:.4f}")
 
 # save results
 results = {
-   'gat_e5_accuracy': gat_e5_accuracy,
-   'gat_e5_f1': gat_e5_f1,
-   'gat_ga_accuracy': gat_ga_accuracy,
-   'gat_ga_f1': gat_ga_f1,
-   'gat_original_accuracy': gat_original_accuracy,
-   'gat_original_f1': gat_original_f1,
+   'gat_e5_test_accuracy': gat_e5_test_accuracy,
+   'gat_e5_test_f1': gat_e5_test_f1,
+   'gat_e5_best_val': gat_e5_best_val,
+   'gat_e5_best_f1': gat_e5_best_f1,
+   'gat_ga_test_accuracy': gat_ga_test_accuracy,
+   'gat_ga_test_f1': gat_ga_test_f1,
+   'gat_ga_best_val': gat_ga_best_val,
+   'gat_ga_best_f1': gat_ga_best_f1,
+   'gat_original_test_accuracy': gat_original_test_accuracy,
+   'gat_original_test_f1': gat_original_test_f1,
+   'gat_original_best_val': gat_original_best_val,
+   'gat_original_best_f1': gat_original_best_f1
 }
-with open(os.path.join(processed_dir, 'gat_results.pkl'), 'wb') as f:
+
+# save results
+if to_sample:
+   sampled = 'multihop'
+else:
+   sampled = 'batchify'
+
+with open(os.path.join(processed_dir, f'gat_results_{sampled}.pkl'), 'wb') as f:
    pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 # save model
-th.save(gat_e5.state_dict(), os.path.join(processed_dir, 'gat_e5_model.pth'))
-th.save(gat_ga.state_dict(), os.path.join(processed_dir, 'gat_ga_model.pth'))
-th.save(gat_original.state_dict(), os.path.join(processed_dir, 'gat_original_model.pth'))
+#th.save(gat_e5.state_dict(), os.path.join(processed_dir, 'gat_e5_model.pth'))
+#th.save(gat_ga.state_dict(), os.path.join(processed_dir, 'gat_ga_model.pth'))
+#th.save(gat_original.state_dict(), os.path.join(processed_dir, 'gat_original_model.pth'))
 
