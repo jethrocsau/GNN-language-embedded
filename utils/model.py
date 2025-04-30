@@ -17,45 +17,33 @@ to_sample = True
 class GAT(nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, num_heads):
         super(GAT, self).__init__()
-        self.layer1 = GATConv(in_dim, hidden_dim, num_heads=num_heads)
-        self.layer2 = GATConv(hidden_dim * num_heads, hidden_dim, num_heads=num_heads)
-        self.layer3 = GATConv(hidden_dim, out_dim, num_heads=1)
+        self.layer1 = GATConv(in_dim, hidden_dim, num_heads=num_heads,attn_drop = 0.3,feat_drop=0.3,activation=F.relu)
+        self.layer2 = GATConv(hidden_dim * num_heads, hidden_dim, num_heads=num_heads, attn_drop = 0.3,feat_drop=0.3,activation=F.relu)
+        self.layer3 = GATConv(hidden_dim, out_dim, num_heads=1, attn_drop = 0.3,feat_drop=0.3,activation=F.relu)
 
     def forward(self, graph, h):
         # Handle both full graph and block-based inputs
         if isinstance(graph, list):  # If we're using blocks
             h = self.layer1(graph[0], h)
             h = h.view(h.shape[0], -1)
-            h = F.relu(h)
-            h = F.dropout(h, p=0.3, training=self.training)
 
             # layer2
             h = self.layer2(graph[1], h)
             h = h.view(h.shape[0], -1)
-            h = F.relu(h)
-            h = F.dropout(h, p=0.3, training=self.training)
 
             # layer3
             h = self.layer3(graph[2], h)
             h = h.view(h.shape[0], -1)
-            h = F.relu(h)
-            h = F.dropout(h, p=0.3, training=self.training)
             h = h.squeeze(1)
         else:
             h = self.layer1(graph, h)
             h = h.view(h.shape[0], -1)
-            h = F.relu(h)
-            h = F.dropout(h, p=0.3, training=self.training)
 
             h = self.layer2(graph, h)
             h = h.view(h.shape[0], -1)
-            h = F.relu(h)
-            h = F.dropout(h, p=0.3, training=self.training)
 
             h = self.layer3(graph, h)
             h = h.view(h.shape[0], -1)
-            h = F.relu(h)
-            h = F.dropout(h, p=0.3, training=self.training)
             h = h.squeeze(1)
         return h
 
