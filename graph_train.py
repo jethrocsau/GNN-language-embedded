@@ -12,8 +12,18 @@ import torch.nn as nn
 from sklearn.metrics import accuracy_score, f1_score
 from dgl.dataloading import GraphDataLoader
 from dgl.data.utils import load_graphs
+from torchsummary import summary
 
 from utils.model import GAT, MLP, evaluate, train_model
+import argparse
+
+#get arguments
+parser = argparse.ArgumentParser(
+                    prog='MSBD5008 Graph Embedding Training',
+                    description='Graph embedding')
+parser.add_argument('--sample',  default=False,action='store_true',
+                    help='True: multihop sampling, False: batchify sampling')
+args = parser.parse_args()
 
 #init dir
 # set params
@@ -79,9 +89,10 @@ labels = labels.to(device)
 
 
 # train model with normal sampling
-to_sample=False #batchify sampling
-#to_sample = True #multihop sampling
+to_sample = args.sample
 
+print("Model Architecture of e5: ")
+print(gat_e5)
 gat_e5_state, gat_e5_best_val, gat_e5_best_f1 = train_model(
    gat_e5,
    graph,
@@ -94,7 +105,10 @@ gat_e5_state, gat_e5_best_val, gat_e5_best_f1 = train_model(
    to_sample=to_sample
 )
 gat_e5.load_state_dict(gat_e5_state)
+print("------------------------------------------------")
 
+print("Model Architecture of graphalign: ")
+print(gat_ga)
 gat_ga_state, gat_ga_best_val,gat_ga_best_f1 = train_model(
    gat_ga,
    graph,
@@ -107,7 +121,11 @@ gat_ga_state, gat_ga_best_val,gat_ga_best_f1 = train_model(
    to_sample=to_sample
 )
 gat_ga.load_state_dict(gat_ga_state)
+print("------------------------------------------------")
 
+
+print("Model Architecture of original: ")
+print(gat_original)
 gat_original_state, gat_original_best_val,gat_original_best_f1 = train_model(
    gat_original,
    graph,
@@ -120,6 +138,7 @@ gat_original_state, gat_original_best_val,gat_original_best_f1 = train_model(
    to_sample=to_sample
 )
 gat_original.load_state_dict(gat_original_state)
+print("------------------------------------------------")
 
 # evaluate
 gat_e5_test_accuracy, gat_e5_test_f1 = evaluate(

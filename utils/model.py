@@ -46,10 +46,12 @@ class GAT(nn.Module):
             h = h.view(h.shape[0], -1)
             h = F.relu(h)
             h = F.dropout(h, p=0.3, training=self.training)
+
             h = self.layer2(graph, h)
             h = h.view(h.shape[0], -1)
             h = F.relu(h)
             h = F.dropout(h, p=0.3, training=self.training)
+
             h = self.layer3(graph, h)
             h = h.view(h.shape[0], -1)
             h = F.relu(h)
@@ -101,6 +103,7 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
     best_val_acc = 0
     best_f1 = 0
     best_model_state = None
+    model.training = True
 
     # Convert indices to tensors if they're not already
     if isinstance(train_idx, np.ndarray):
