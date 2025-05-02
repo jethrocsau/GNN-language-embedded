@@ -13,6 +13,7 @@ from sklearn.metrics import accuracy_score, f1_score
 from dgl.dataloading import GraphDataLoader
 from dgl.data.utils import load_graphs
 from torchsummary import summary
+import pandas as pd
 
 from utils.model import GAT, MLP, evaluate, train_model
 import argparse
@@ -23,6 +24,7 @@ parser = argparse.ArgumentParser(
                     description='Graph embedding')
 parser.add_argument('--sample',  default=False,action='store_true',
                     help='True: multihop sampling, False: batchify sampling')
+parser.add_arugument('--graph_idx', defalul=0, type=int,)
 args = parser.parse_args()
 
 #init dir
@@ -40,7 +42,16 @@ th.manual_seed(42)
 # set foldrs
 data_dir = os.path.join(cwd, 'data')
 processed_dir = os.path.join(cwd, 'processed')
-graph_path = os.path.join(processed_dir,'combined_graph_pca.bin')
+
+# load graph path
+GRAPHS = ['combined-graph_pca.bin','graph0.bin','graph1.bin']
+if args.graph_idx == 0:
+   graph_name = 'Arxiv'
+elif args.graph_idx == 1:
+   graph_name = 'MAG'
+else:
+   graph_name = 'Joined'
+graph_path = os.path.join(processed_dir,GRAPHS[args.graph_idx])
 
 # load graph
 graphs, _ = load_graphs(graph_path)
@@ -93,7 +104,7 @@ to_sample = args.sample
 
 print("Model Architecture of e5: ")
 print(gat_e5)
-gat_e5_state, gat_e5_best_val, gat_e5_best_f1 = train_model(
+gat_e5_state, gat_e5_best_train, gat_e5_train_f1, gat_e5_best_val, gat_e5_best_f1 = train_model(
    gat_e5,
    graph,
    e5_features,
@@ -109,7 +120,7 @@ print("------------------------------------------------")
 
 print("Model Architecture of graphalign: ")
 print(gat_ga)
-gat_ga_state, gat_ga_best_val,gat_ga_best_f1 = train_model(
+gat_ga_state, gat_ga_best_train, gat_ga_train_f1, gat_ga_best_val,gat_ga_best_f1 = train_model(
    gat_ga,
    graph,
    ga_features,
@@ -126,7 +137,7 @@ print("------------------------------------------------")
 
 print("Model Architecture of original: ")
 print(gat_original)
-gat_original_state, gat_original_best_val,gat_original_best_f1 = train_model(
+gat_original_state, gat_original_best_train, gat_original_train_f1, gat_original_best_val,gat_original_best_f1 = train_model(
    gat_original,
    graph,
    original_features,
@@ -173,19 +184,62 @@ print(f"GAT Original Test Accuracy: {gat_original_test_accuracy:.4f}, F1: {gat_o
 
 # save results
 results = {
+   'gat_e5_train_accuracy': gat_e5_best_train,
+   'gat_e5_train_f1': gat_e5_train_f1,
    'gat_e5_test_accuracy': gat_e5_test_accuracy,
    'gat_e5_test_f1': gat_e5_test_f1,
    'gat_e5_best_val': gat_e5_best_val,
    'gat_e5_best_f1': gat_e5_best_f1,
+   'gat_ga_train_accuracy': gat_ga_best_train,
+   'gat_ga_train_f1': gat_ga_train_f1,
    'gat_ga_test_accuracy': gat_ga_test_accuracy,
    'gat_ga_test_f1': gat_ga_test_f1,
    'gat_ga_best_val': gat_ga_best_val,
    'gat_ga_best_f1': gat_ga_best_f1,
+   'gat_original_train_accuracy': gat_original_best_train,
+   'gat_original_train_f1': gat_original_train_f1,
    'gat_original_test_accuracy': gat_original_test_accuracy,
    'gat_original_test_f1': gat_original_test_f1,
    'gat_original_best_val': gat_original_best_val,
    'gat_original_best_f1': gat_original_best_f1
 }
+
+df = [{
+   'Model' : 'GAT',
+   'Graph' : graph_name,
+   'Feature': 'E5 Embedding',
+   'Train_Accuracy': gat_e5_best_train,
+   'Train_F1': gat_e5_train_f1
+   'Best_Val_Epoch': gat_e5_best_val,
+   'Best_Val_F1': gat_e5_best_f1,
+   'Test_Accuracy': gat_e5_test_accuracy,
+   'Test_F1': gat_e5_test_f1,
+},
+{
+   'Model' : 'GAT',
+   'Graph' : graph_name,
+   'Feature': 'GraphAlign',
+   'Train_Accuracy': gat_ga_best_train,
+   'Train_F1': gat_ga_train_f1,
+   'Best_Val_Epoch': gat_ga_best_val,
+   'Best_Val_F1': gat_ga_best_f1,
+   'Test_Accuracy': gat_ga_test_accuracy,
+   'Test_F1': gat_ga_test_f1,
+},
+{
+   'Model' : 'GAT',
+   'Graph' : graph_name,
+   'Feature': 'Original',
+   'Train_Accuracy': gat_original_best_train,
+   'Train_F1': gat_original_train_f1,
+   'Best_Val_Epoch': gat_original_best_val,
+   'Best_Val_F1': gat_original_best_f1,
+   'Test_Accuracy': gat_original_test_accuracy,
+   'Test_F1': gat_original_test_f1,
+}
+]
+
+
 
 # save results
 if to_sample:
@@ -193,8 +247,12 @@ if to_sample:
 else:
    sampled = 'batchify'
 
-with open(os.path.join(processed_dir, f'gat_results_{sampled}.pkl'), 'wb') as f:
+with open(os.path.join(processed_dir, f'gat_results_{graph_name}_{sampled}.pkl'), 'wb') as f:
    pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+#save csv
+save_df = pd.DataFrame.from_dict(results, orient='index')
+save_df.to_csv(os.path.join(processed_dir, f'gat_results_{graph_name}_{sampled}.csv'), index=True)
 
 # save model
 #th.save(gat_e5.state_dict(), os.path.join(processed_dir, 'gat_e5_model.pth'))

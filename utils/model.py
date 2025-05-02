@@ -90,6 +90,8 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
     optimizer = th.optim.Adam(model.parameters(), lr=lr, weight_decay=5e-4)
     best_val_acc = 0
     best_f1 = 0
+    best_train_acc = 0
+    best_train_f1 = 0
     best_model_state = None
     model.training = True
 
@@ -192,6 +194,7 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
 
         # After each epoch, evaluate the model on the validation set - only on val_idx
         model.eval()
+        train_acc, train_f1 = evaluate(model, graph, features, labels, train_idx, is_mlp=is_mlp)
         val_acc, val_f1 = evaluate(model, graph, features, labels, val_idx, is_mlp=is_mlp)
         print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/batch_count:.4f}, Val Acc: {val_acc:.4f}, Val F1: {val_f1:.4f}")
         if val_acc > best_val_acc:
@@ -199,8 +202,12 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
             best_model_state = model.state_dict()
             best_f1 = val_f1
             print(f"Best model updated at epoch {epoch+1} with val acc: {best_val_acc:.4f}, val f1: {best_f1:.4f}")
+        if train_acc > best_train_acc:
+            best_train_acc = train_acc
+            best_train_f1 = train_f1
 
-    return best_model_state, best_val_acc, best_f1
+
+    return best_model_state, train_acc, train_f1, best_val_acc, best_f1
 
 def batchify(graph, train_idx, batch_size):
     #if not on device
