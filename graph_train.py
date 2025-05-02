@@ -44,7 +44,7 @@ data_dir = os.path.join(cwd, 'data')
 processed_dir = os.path.join(cwd, 'processed')
 
 # load graph path
-GRAPHS = ['combined-graph_pca.bin','graph0.bin','graph1.bin']
+GRAPHS = ['combined_graph_pca.bin','graph0.bin','graph1.bin']
 if args.graph_idx == 0:
    graph_name = 'joiened'
 elif args.graph_idx == 1:
@@ -250,7 +250,7 @@ with open(os.path.join(processed_dir, f'gat_results_{graph_name}_{sampled}.pkl')
    pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 #save csv
-save_df = pd.DataFrame.from_dict(results, orient='index')
+save_df = pd.DataFrame.from_dict(df, orient='index')
 save_df.to_csv(os.path.join(processed_dir, f'gat_results_{graph_name}_{sampled}.csv'), index=True)
 
 # save model
