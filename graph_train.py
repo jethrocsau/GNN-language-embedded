@@ -24,7 +24,7 @@ parser = argparse.ArgumentParser(
                     description='Graph embedding')
 parser.add_argument('--sample',  default=False,action='store_true',
                     help='True: multihop sampling, False: batchify sampling')
-parser.add_arugument('--graph_idx', defalul=0, type=int,)
+parser.add_argument('--graph_idx', default=0, type=int,)
 args = parser.parse_args()
 
 #init dir
@@ -46,11 +46,11 @@ processed_dir = os.path.join(cwd, 'processed')
 # load graph path
 GRAPHS = ['combined-graph_pca.bin','graph0.bin','graph1.bin']
 if args.graph_idx == 0:
-   graph_name = 'Arxiv'
+   graph_name = 'joiened'
 elif args.graph_idx == 1:
    graph_name = 'MAG'
 else:
-   graph_name = 'Joined'
+   graph_name = 'arxiv'
 graph_path = os.path.join(processed_dir,GRAPHS[args.graph_idx])
 
 # load graph
@@ -209,7 +209,7 @@ df = [{
    'Graph' : graph_name,
    'Feature': 'E5 Embedding',
    'Train_Accuracy': gat_e5_best_train,
-   'Train_F1': gat_e5_train_f1
+   'Train_F1': gat_e5_train_f1,
    'Best_Val_Epoch': gat_e5_best_val,
    'Best_Val_F1': gat_e5_best_f1,
    'Test_Accuracy': gat_e5_test_accuracy,
@@ -238,7 +238,6 @@ df = [{
    'Test_F1': gat_original_test_f1,
 }
 ]
-
 
 
 # save results
