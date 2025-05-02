@@ -201,13 +201,14 @@ def train_model(model, graph, features, labels, train_idx, val_idx, epochs=200, 
             best_val_acc = val_acc
             best_model_state = model.state_dict()
             best_f1 = val_f1
+            best_val_epoch = epoch +1
             print(f"Best model updated at epoch {epoch+1} with val acc: {best_val_acc:.4f}, val f1: {best_f1:.4f}")
         if train_acc > best_train_acc:
             best_train_acc = train_acc
             best_train_f1 = train_f1
 
 
-    return best_model_state, train_acc, train_f1, best_val_acc, best_f1
+    return best_model_state, train_acc, train_f1, best_val_acc, best_f1, best_val_epoch
 
 def batchify(graph, train_idx, batch_size):
     #if not on device

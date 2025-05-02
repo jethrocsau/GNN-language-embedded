@@ -104,7 +104,7 @@ to_sample = args.sample
 
 print("Model Architecture of e5: ")
 print(gat_e5)
-gat_e5_state, gat_e5_best_train, gat_e5_train_f1, gat_e5_best_val, gat_e5_best_f1 = train_model(
+gat_e5_state, gat_e5_best_train, gat_e5_train_f1, gat_e5_best_val, gat_e5_best_f1,gat_original_best_epoch = train_model(
    gat_e5,
    graph,
    e5_features,
@@ -120,7 +120,7 @@ print("------------------------------------------------")
 
 print("Model Architecture of graphalign: ")
 print(gat_ga)
-gat_ga_state, gat_ga_best_train, gat_ga_train_f1, gat_ga_best_val,gat_ga_best_f1 = train_model(
+gat_ga_state, gat_ga_best_train, gat_ga_train_f1, gat_ga_best_val,gat_ga_best_f1, gat_ga_best_epoch= train_model(
    gat_ga,
    graph,
    ga_features,
@@ -137,7 +137,7 @@ print("------------------------------------------------")
 
 print("Model Architecture of original: ")
 print(gat_original)
-gat_original_state, gat_original_best_train, gat_original_train_f1, gat_original_best_val,gat_original_best_f1 = train_model(
+gat_original_state, gat_original_best_train, gat_original_train_f1, gat_original_best_val,gat_original_best_f1, gat_e5_best_epoch = train_model(
    gat_original,
    graph,
    original_features,
@@ -208,9 +208,10 @@ df = [{
    'Model' : 'GAT',
    'Graph' : graph_name,
    'Feature': 'E5 Embedding',
+   'Best Val Epoch': gat_e5_best_epoch,
    'Train_Accuracy': gat_e5_best_train,
    'Train_F1': gat_e5_train_f1,
-   'Best_Val_Epoch': gat_e5_best_val,
+   'Best_Val_Accuracy': gat_e5_best_val,
    'Best_Val_F1': gat_e5_best_f1,
    'Test_Accuracy': gat_e5_test_accuracy,
    'Test_F1': gat_e5_test_f1,
@@ -219,9 +220,10 @@ df = [{
    'Model' : 'GAT',
    'Graph' : graph_name,
    'Feature': 'GraphAlign',
+   'Best Val Epoch': gat_ga_best_epoch,
    'Train_Accuracy': gat_ga_best_train,
    'Train_F1': gat_ga_train_f1,
-   'Best_Val_Epoch': gat_ga_best_val,
+   'Best_Val_Accuracy': gat_ga_best_val,
    'Best_Val_F1': gat_ga_best_f1,
    'Test_Accuracy': gat_ga_test_accuracy,
    'Test_F1': gat_ga_test_f1,
@@ -230,9 +232,10 @@ df = [{
    'Model' : 'GAT',
    'Graph' : graph_name,
    'Feature': 'Original',
+   'Best Val Epoch': gat_e5_best_epoch,
    'Train_Accuracy': gat_original_best_train,
    'Train_F1': gat_original_train_f1,
-   'Best_Val_Epoch': gat_original_best_val,
+   'Best_Val_Accuracy': gat_original_best_val,
    'Best_Val_F1': gat_original_best_f1,
    'Test_Accuracy': gat_original_test_accuracy,
    'Test_F1': gat_original_test_f1,
@@ -250,7 +253,7 @@ with open(os.path.join(processed_dir, f'gat_results_{graph_name}_{sampled}.pkl')
    pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 #save csv
-save_df = pd.DataFrame.from_dict(df, orient='index')
+save_df = pd.DataFrame(df)
 save_df.to_csv(os.path.join(processed_dir, f'gat_results_{graph_name}_{sampled}.csv'), index=True)
 
 # save model
