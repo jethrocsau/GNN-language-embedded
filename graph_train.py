@@ -44,13 +44,15 @@ data_dir = os.path.join(cwd, 'data')
 processed_dir = os.path.join(cwd, 'processed')
 
 # load graph path
-GRAPHS = ['combined_graph_pca.bin','graph0.bin','graph1.bin']
+GRAPHS = ['combined_graph_pca.bin','graph0.bin','graph1.bin','pca_graph.bin']
 if args.graph_idx == 0:
    graph_name = 'joiened'
 elif args.graph_idx == 1:
    graph_name = 'MAG'
-else:
+elif args.graph_idx == 2:
    graph_name = 'arxiv'
+elif args.graph_idx == 3:
+   graph_name = 'pca'
 graph_path = os.path.join(processed_dir,GRAPHS[args.graph_idx])
 
 # load graph
@@ -58,10 +60,14 @@ graphs, _ = load_graphs(graph_path)
 graph = graphs[0]
 labels = graph.ndata['label']
 
+
 #load features
-e5_features = graph.ndata['e5_feat']
-ga_features = graph.ndata['ga_embedding']
-original_features = graph.ndata['feat']
+if graph_name == 'pca':
+   pca_feature = graph.ndata['w2v']
+else:
+   e5_features = graph.ndata['e5_feat']
+   ga_features = graph.ndata['ga_embedding']
+   original_features = graph.ndata['feat']
 
 
 #get indices
@@ -88,6 +94,7 @@ gat_e5 = GAT(e5_features.shape[1],e5_hidden_dim , output_dim, gat_heads)
 gat_ga = GAT(ga_features.shape[1],ga_hidden_dim , output_dim, gat_heads)
 gat_original = GAT(original_features.shape[1],original_hidden_dim , output_dim, gat_heads)
 
+
 # Move models and data `to device
 gat_e5 = gat_e5.to(device)
 gat_ga = gat_ga.to(device)
@@ -104,7 +111,7 @@ to_sample = args.sample
 
 print("Model Architecture of e5: ")
 print(gat_e5)
-gat_e5_state, gat_e5_best_train, gat_e5_train_f1, gat_e5_best_val, gat_e5_best_f1,gat_original_best_epoch = train_model(
+gat_e5_state, gat_e5_best_train, gat_e5_train_f1, gat_e5_best_val, gat_e5_best_f1,gat_e5_best_epoch = train_model(
    gat_e5,
    graph,
    e5_features,
@@ -137,7 +144,7 @@ print("------------------------------------------------")
 
 print("Model Architecture of original: ")
 print(gat_original)
-gat_original_state, gat_original_best_train, gat_original_train_f1, gat_original_best_val,gat_original_best_f1, gat_e5_best_epoch = train_model(
+gat_original_state, gat_original_best_train, gat_original_train_f1, gat_original_best_val,gat_original_best_f1, gat_original_best_epoch = train_model(
    gat_original,
    graph,
    original_features,

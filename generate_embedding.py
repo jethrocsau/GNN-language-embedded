@@ -28,8 +28,8 @@ data_dir = os.path.join(cwd, 'data')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # datset names
-dataset_names = ['ogbn-mag','ogbn-arxiv','combined']
-idx_dataset = input("Select dataset (0: ogbn-mag, 1: ogbn-arxiv, 2: combined): ")
+dataset_names = ['ogbn-mag','ogbn-arxiv','combined','pca-word2vec']
+idx_dataset = input("Select dataset (0: ogbn-mag, 1: ogbn-arxiv, 2: combined, 3: pca_w2v): ")
 idx_dataset = int(idx_dataset)  # Convert to integer
 if idx_dataset < 0 or idx_dataset >= len(dataset_names):
     raise ValueError("Invalid dataset index. Please choose 0 or 1.")
